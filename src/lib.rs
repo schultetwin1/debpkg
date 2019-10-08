@@ -1,7 +1,67 @@
-use std::io::{Error, ErrorKind, Read, Result};
+use std::io::Read;
+use std::io::Error as IoError;
 use std::string::String;
+use std::fmt;
+use std::error::Error as StdError;
 
-const DEBIAN_BINARY_IDENTIFIER: [u8; 16] = ['d' as u8, 'e' as u8, 'b' as u8, 'i' as u8, 'a' as u8, 'n' as u8, '-' as u8, 'b' as u8, 'i' as u8, 'n' as u8, 'a' as u8, 'r' as u8, 'y' as u8, ' ' as u8, ' ' as u8, ' ' as u8];
+
+#[derive(Debug)]
+pub enum Error {
+    InvalidVersion,
+    MissingDebianBinary,
+    MissingControlFile,
+    MissingControlArchive,
+    MissingDataArchive,
+    EmptyArchive,
+    Io(IoError),
+    LzmaError(lzma::LzmaError)
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Error::Io(ref err) => write!(f, "{}", err),
+            _ => write!(f, "{}", self.description()),
+        }
+    }
+}
+
+impl StdError for Error {
+    fn description(&self) -> &str {
+        match self {
+            Error::InvalidVersion => "Contents of debian_binary is not 2.0",
+            Error::MissingDebianBinary => "Missing debian_binary file",
+            Error::EmptyArchive => "Archive is empty",
+            Error::MissingControlFile => "control archive is missing control file",
+            Error::MissingControlArchive => "control archive is missing",
+            Error::MissingDataArchive => "data archive is missing",
+            Error::Io(_err) => "IO Error",
+            Error::LzmaError(_err) => "Lzma Error",
+        }
+    }
+
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match *self {
+            Error::Io(ref err) => Some(err),
+            Error::LzmaError(ref err) => Some(err),
+            _ => None,
+        }
+    }
+}
+
+impl From<IoError> for Error {
+    fn from(err: IoError) -> Error {
+        Error::Io(err)
+    }
+}
+
+impl From<lzma::LzmaError> for Error {
+    fn from(err: lzma::LzmaError) -> Error {
+        Error::LzmaError(err)
+    }
+}
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct DebPkg<R: Read> {
     archive: ar::Archive<R>,
@@ -14,29 +74,109 @@ fn check_debian_binary_contents<R: Read>(entry: &mut ar::Entry<R>) -> Result<()>
     if contents == "2.0\n" {
         Ok(())
     } else {
-        let msg = "debian-binary file did not contain correct version";
-        Err(Error::new(ErrorKind::InvalidInput, msg))
+        Err(Error::InvalidVersion)
     }
 }
 
 fn check_for_debian_binary<R: Read>(archive: &mut ar::Archive<R>) -> Result<()> {
+    let identifier = "debian-binary";
     if let Some(entry_result) = archive.next_entry() {
         match entry_result {
             Ok(mut entry) => {
-                if entry.header().identifier() == DEBIAN_BINARY_IDENTIFIER {
+                if entry.header().identifier() == identifier.as_bytes() {
                     check_debian_binary_contents(&mut entry)?;
                 } else {
-                    let msg = "archive did not contain debian-binary file";
-                    return Err(Error::new(ErrorKind::InvalidInput, msg));
+                    return Err(Error::MissingDebianBinary);
                 }
             },
-            Err(err) => return Err(err)
+            Err(err) => return Err(Error::Io(err))
         }
     } else {
-        let msg = "An empty ar file in not a valid debian package";
-        return Err(Error::new(ErrorKind::UnexpectedEof, msg));
+        return Err(Error::EmptyArchive);
     }
     Ok(())
+}
+
+fn untar_control_data<R: Read>(tar_reader: R) -> Result<String> {
+    let mut tar = tar::Archive::new(tar_reader);
+    let entries = tar.entries()?;
+    let control_entry = entries.filter_map(|x| x.ok()).filter(|entry| entry.path().is_ok()).find(|entry| {
+        let path = entry.path().unwrap();
+        path == std::path::Path::new("./control")
+    });
+    match control_entry {
+        Some(mut control) => {
+            let mut string = std::string::String::default();
+            let _ = control.read_to_string(&mut string)?;
+            Ok(string)
+        },
+        None => Err(Error::MissingControlFile)
+    }
+}
+
+fn extract_control_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<String> {
+    if let Some(entry_result) = archive.next_entry() {
+        match entry_result {
+            Ok(entry) => {
+                let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
+
+                match entry_ident {
+                    "control.tar" => {
+                        untar_control_data(entry)
+                    },
+                    "control.tar.gz" => {
+                        let reader = flate2::read::GzDecoder::new(entry);
+                        untar_control_data(reader)
+                    },
+                    "control.tar.xz" => {
+                        let reader = lzma::LzmaReader::new_decompressor(entry)?;
+                        untar_control_data(reader)
+                    },
+                    "control.tar.zst" => unimplemented!(),
+                    _ => {
+                        Err(Error::MissingControlArchive)
+                    }
+                }
+            },
+            Err(err) => {
+                Err(Error::Io(err))
+            }
+        }
+    } else {
+        Err(Error::MissingControlArchive)
+    }
+}
+
+fn check_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<()> {
+    if let Some(entry_result) = archive.next_entry() {
+        match entry_result {
+            Ok(entry) => {
+                let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
+
+                match entry_ident {
+                    "data.tar" => {
+                        Ok(())
+                    },
+                    "data.tar.gz" => {
+                        Ok(())
+                    },
+                    "data.tar.xz" => {
+                        Ok(())
+                    },
+                    "data.tar.zst" => unimplemented!(),
+                    _ => {
+                        Err(Error::MissingDataArchive)
+                    }
+                }
+            },
+            Err(err) => {
+                Err(Error::Io(err))
+            }
+        }
+    } else {
+        Err(Error::MissingDataArchive)
+    }
+
 }
 
 impl<R: Read> DebPkg<R> {
@@ -44,6 +184,8 @@ impl<R: Read> DebPkg<R> {
         let mut archive = ar::Archive::new(reader);
 
         check_for_debian_binary(&mut archive)?;
+        let _control = extract_control_data(&mut archive)?;
+        check_data(&mut archive)?;
 
         Ok(DebPkg {
             archive

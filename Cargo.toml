@@ -1,5 +1,5 @@
 [package]
-name = "DebPkg"
+name = "debpkg"
 version = "0.1.0"
 authors = ["Matt Schulte <schultetwin1@gmail.com>"]
 edition = "2018"
@@ -8,4 +8,7 @@ edition = "2018"
 
 [dependencies]
 ar = "0.8.0"
+flate2 = "1.0.12"
+rust-lzma = "0.4.0"
+tar = "0.4.26"
 tempfile = "3.1.0"
