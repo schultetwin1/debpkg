@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{Read, Seek};
 use std::io::Error as IoError;
 use std::string::String;
 use std::fmt;
@@ -63,8 +63,8 @@ impl From<lzma::LzmaError> for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub struct DebPkg<R: Read> {
-    archive: ar::Archive<R>,
+pub struct DebPkg<R: Seek + Read> {
+    archive: ar::Archive<R>
 }
 
 fn check_debian_binary_contents<R: Read>(entry: &mut ar::Entry<R>) -> Result<()> {
@@ -147,7 +147,7 @@ fn extract_control_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<String>
     }
 }
 
-fn check_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<()> {
+fn get_data_entry<R: Read>(archive: &mut ar::Archive<R>) -> Result<ar::Entry<R>> {
     if let Some(entry_result) = archive.next_entry() {
         match entry_result {
             Ok(entry) => {
@@ -155,13 +155,13 @@ fn check_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<()> {
 
                 match entry_ident {
                     "data.tar" => {
-                        Ok(())
+                        Ok(entry)
                     },
                     "data.tar.gz" => {
-                        Ok(())
+                        Ok(entry)
                     },
                     "data.tar.xz" => {
-                        Ok(())
+                        Ok(entry)
                     },
                     "data.tar.zst" => unimplemented!(),
                     _ => {
@@ -179,17 +179,47 @@ fn check_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<()> {
 
 }
 
-impl<R: Read> DebPkg<R> {
+impl<R: Read + Seek> DebPkg<R> {
     pub fn parse(reader: R) -> Result<DebPkg<R>> {
         let mut archive = ar::Archive::new(reader);
 
         check_for_debian_binary(&mut archive)?;
         let _control = extract_control_data(&mut archive)?;
-        check_data(&mut archive)?;
+        let _ = get_data_entry(&mut archive)?;
 
         Ok(DebPkg {
             archive
         })
+    }
+
+    pub fn unpack<P: AsRef<std::path::Path>>(&mut self, dst: P) -> Result<()> {
+        let entry = self.archive.jump_to_entry(2)?;
+        let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
+
+        match entry_ident {
+            "data.tar" => {
+                let mut tar = tar::Archive::new(entry);
+                tar.unpack(dst)?;
+                Ok(())
+            },
+            "data.tar.gz" => {
+                let gz = flate2::read::GzDecoder::new(entry);
+                let mut tar = tar::Archive::new(gz);
+                tar.unpack(dst)?;
+                Ok(())
+            },
+            "data.tar.xz" => {
+                let xz = lzma::LzmaReader::new_decompressor(entry)?;
+                let mut tar = tar::Archive::new(xz);
+                tar.unpack(dst)?;
+                Ok(())
+            },
+            "data.tar.zst" => unimplemented!(),
+            _ => {
+                Err(Error::MissingDataArchive)
+            }
+        }
+
     }
 }
 

@@ -117,6 +117,8 @@ fn xz_utils_parses() {
     let xz_deb_path = get_deb_path("xz-utils_5.2.4-1_amd64.deb");
     let xz_deb = std::fs::File::open(xz_deb_path).unwrap();
 
-    let pkg_result = debpkg::DebPkg::parse(xz_deb);
-    assert!(pkg_result.is_ok());
+    let mut pkg = debpkg::DebPkg::parse(xz_deb).unwrap();
+
+    let dir = tempfile::TempDir::new().unwrap();
+    pkg.unpack(dir).unwrap();
 }
