@@ -122,3 +122,14 @@ fn xz_utils_parses() {
     let dir = tempfile::TempDir::new().unwrap();
     pkg.unpack(dir).unwrap();
 }
+
+#[test]
+fn libgssglue_utils_parses() {
+    let libgssglue_deb_path = get_deb_path("libgssglue1_0.3-4_amd64.deb");
+    let libgssglue_deb = std::fs::File::open(libgssglue_deb_path).unwrap();
+
+    let mut pkg = debpkg::DebPkg::parse(libgssglue_deb).unwrap();
+
+    let dir = tempfile::TempDir::new().unwrap();
+    pkg.unpack(dir).unwrap();
+}
