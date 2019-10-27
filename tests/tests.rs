@@ -118,6 +118,8 @@ fn xz_utils_parses() {
     let xz_deb = std::fs::File::open(xz_deb_path).unwrap();
 
     let mut pkg = debpkg::DebPkg::parse(xz_deb).unwrap();
+    assert!(pkg.name() == "xz-utils");
+    assert!(pkg.pkgype() == debpkg::PackageType::Deb);
 
     let dir = tempfile::TempDir::new().unwrap();
     pkg.unpack(dir).unwrap();

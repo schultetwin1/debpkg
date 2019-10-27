@@ -4,7 +4,8 @@ use std::convert::TryFrom;
 
 use crate::{Error, Result};
 
-pub enum DebType {
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum PackageType {
     Deb,
     UDeb
 }
@@ -70,30 +71,30 @@ impl TryFrom<&str> for ControlField {
     }
 }
 
-impl TryFrom<&str> for DebType {
+impl TryFrom<&str> for PackageType {
     type Error = crate::Error;
 
-    fn try_from(string: &str) -> Result<DebType> {
+    fn try_from(string: &str) -> Result<PackageType> {
         match string.to_lowercase().as_str() {
-            "deb" => Ok(DebType::Deb),
-            "udeb" => Ok(DebType::UDeb),
+            "deb" => Ok(PackageType::Deb),
+            "udeb" => Ok(PackageType::UDeb),
             _ => Err(Error::InvalidPackageType)
         }
     }
 }
 
-impl Into<&str> for DebType {
+impl Into<&str> for PackageType {
     fn into(self) -> &'static str {
         match self {
-            DebType::Deb => "deb",
-            DebType::UDeb => "udeb"
+            PackageType::Deb => "deb",
+            PackageType::UDeb => "udeb"
         }
     }
 }
 
 pub struct DebControl {
     name: String,
-    pkgtype: DebType,
+    pkgtype: PackageType,
     version: String,
     maintainer: String,
     arch: String,
@@ -105,7 +106,7 @@ impl DebControl {
 
         let mut ctrl = DebControl {
             name: String::default(),
-            pkgtype: DebType::Deb,
+            pkgtype: PackageType::Deb,
             version: String::default(),
             maintainer: String::default(),
             arch: String::default()
@@ -117,7 +118,7 @@ impl DebControl {
             let split: std::vec::Vec<&str> = line.splitn(2, ":").collect();
             if split.len() == 2 {
                 let field_tag = split[0].to_lowercase();
-                let field_text = split[1];
+                let field_text = split[1].trim();
                 let field_tag = match ControlField::try_from(field_tag.as_str()) {
                     Ok(field_tag) => field_tag,
                     Err(_e) => continue
@@ -140,12 +141,20 @@ impl DebControl {
         self.name.as_str()
     }
 
+    pub fn package_type(&self) -> PackageType {
+        self.pkgtype
+    }
+
+    pub fn version(&self) -> &str {
+        self.version.as_str()
+    }
+
     fn set_name(&mut self, name: &str) {
         self.name.insert_str(0, name);
     }
 
     fn set_package_type(&mut self, package_type: &str) -> Result<()> {
-        let pkgtype = DebType::try_from(package_type)?;
+        let pkgtype = PackageType::try_from(package_type)?;
         self.pkgtype = pkgtype;
         Ok(())
     }
@@ -160,5 +169,37 @@ impl DebControl {
 
     fn set_arch(&mut self, arch: &str) {
         self.arch.insert_str(0, arch);
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use assert_matches::assert_matches;
+
+    #[test]
+    fn properly_parse_package_type () {
+        let pkgtype = "deb";
+        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::Deb);
+
+        let pkgtype = "DEB";
+        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::Deb);
+
+        let pkgtype = "udeb";
+        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::UDeb);
+
+        let pkgtype = "UDEB";
+        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::UDeb);
+
+        let pkgtype = PackageType::Deb;
+        let pkgtype: &'static str = pkgtype.into();
+        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::Deb);
+
+        let pkgtype = PackageType::UDeb;
+        let pkgtype: &'static str = pkgtype.into();
+        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::UDeb);
+
+        assert_matches!(PackageType::try_from("wrong").unwrap_err(), Error::InvalidPackageType);
     }
 }

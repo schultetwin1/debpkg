@@ -4,7 +4,7 @@ mod error;
 use error::Error;
 
 mod control;
-use control::DebControl;
+pub use control::{DebControl, PackageType};
 
 mod debian_binary;
 use debian_binary::{DebianBinaryVersion, parse_debian_binary_contents};
@@ -12,7 +12,8 @@ use debian_binary::{DebianBinaryVersion, parse_debian_binary_contents};
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct DebPkg<R: Seek + Read> {
-    archive: ar::Archive<R>
+    archive: ar::Archive<R>,
+    control: DebControl
 }
 
 fn extract_debian_binary<R: Read + Seek>(archive: &mut ar::Archive<R>) -> Result<DebianBinaryVersion> {
@@ -79,15 +80,16 @@ fn extract_control_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<DebCont
     }
 }
 
-impl<R: Read + Seek> DebPkg<R> {
+impl<'a, R: Read + Seek> DebPkg<R> {
     pub fn parse(reader: R) -> Result<DebPkg<R>> {
         let mut archive = ar::Archive::new(reader);
 
         extract_debian_binary(&mut archive)?;
-        let _control = extract_control_data(&mut archive)?;
+        let control = extract_control_data(&mut archive)?;
 
         Ok(DebPkg {
-            archive
+            archive,
+            control
         })
     }
 
@@ -118,6 +120,17 @@ impl<R: Read + Seek> DebPkg<R> {
                 Err(Error::MissingDataArchive)
             }
         }
+    }
 
+    pub fn name(&self) -> &str {
+        self.control.name()
+    }
+
+    pub fn pkgype(&self) -> PackageType {
+        self.control.package_type()
+    }
+
+    pub fn version(&self) -> &str {
+        self.control.version()
     }
 }
