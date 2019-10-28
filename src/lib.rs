@@ -4,7 +4,7 @@ mod error;
 use error::Error;
 
 mod control;
-pub use control::{DebControl, PackageType};
+pub use control::Control;
 
 mod debian_binary;
 use debian_binary::{DebianBinaryVersion, parse_debian_binary_contents};
@@ -13,7 +13,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct DebPkg<R: Seek + Read> {
     archive: ar::Archive<R>,
-    control: DebControl
+    control: Control
 }
 
 fn extract_debian_binary<R: Read + Seek>(archive: &mut ar::Archive<R>) -> Result<DebianBinaryVersion> {
@@ -32,7 +32,7 @@ fn extract_debian_binary<R: Read + Seek>(archive: &mut ar::Archive<R>) -> Result
     }
 }
 
-fn untar_control_data<R: Read>(tar_reader: R) -> Result<DebControl> {
+fn untar_control_data<R: Read>(tar_reader: R) -> Result<Control> {
     let mut tar = tar::Archive::new(tar_reader);
     let entries = tar.entries()?;
     let control_entry = entries.filter_map(|x| x.ok()).filter(|entry| entry.path().is_ok()).find(|entry| {
@@ -41,13 +41,13 @@ fn untar_control_data<R: Read>(tar_reader: R) -> Result<DebControl> {
     });
     match control_entry {
         Some(control) => {
-            control::DebControl::parse(control)
+            Control::parse(control)
         },
         None => Err(Error::MissingControlFile)
     }
 }
 
-fn extract_control_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<DebControl> {
+fn extract_control_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<Control> {
     if let Some(entry_result) = archive.next_entry() {
         match entry_result {
             Ok(entry) => {
@@ -124,10 +124,6 @@ impl<'a, R: Read + Seek> DebPkg<R> {
 
     pub fn name(&self) -> &str {
         self.control.name()
-    }
-
-    pub fn pkgype(&self) -> PackageType {
-        self.control.package_type()
     }
 
     pub fn version(&self) -> &str {

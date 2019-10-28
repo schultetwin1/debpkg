@@ -119,7 +119,6 @@ fn xz_utils_parses() {
 
     let mut pkg = debpkg::DebPkg::parse(xz_deb).unwrap();
     assert!(pkg.name() == "xz-utils");
-    assert!(pkg.pkgype() == debpkg::PackageType::Deb);
 
     let dir = tempfile::TempDir::new().unwrap();
     pkg.unpack(dir).unwrap();

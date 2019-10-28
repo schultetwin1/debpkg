@@ -1,174 +1,88 @@
 use std::io::{BufRead, BufReader, Read};
 use std::string::String;
-use std::convert::TryFrom;
+use std::vec::Vec;
 
 use crate::{Error, Result};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub enum PackageType {
-    Deb,
-    UDeb
+use regex::Regex;
+
+type Paragraph = std::collections::HashMap<String, Vec<String>>;
+
+pub struct Control {
+    paragraph: Paragraph
 }
 
-enum ControlField {
-    Package,
-    PackageType,
-    Version,
-    Maintainer,
-    Description,
-    Section,
-    Priority,
-    InstalledSize,
-    Essential,
-    BuildEssential,
-    Architecture,
-    Origin,
-    Bugs,
-}
-
-impl Into<&str> for ControlField {
-    fn into(self) -> &'static str {
-        match self {
-            ControlField::Package => "Package",
-            ControlField::PackageType => "Package-Type",
-            ControlField::Version => "Version",
-            ControlField::Maintainer => "Maintainer",
-            ControlField::Description => "Description",
-            ControlField::Section => "Section",
-            ControlField::Priority => "Priority",
-            ControlField::InstalledSize => "Installed-Size",
-            ControlField::Essential => "Essential",
-            ControlField::BuildEssential => "Build-Essential",
-            ControlField::Architecture => "Architecture",
-            ControlField::Origin => "Origin",
-            ControlField::Bugs => "Bugs"
-        }
+impl Control {
+    fn new() -> Control {
+        Control { paragraph: Paragraph::default() }
     }
-}
 
-impl TryFrom<&str> for ControlField {
-    type Error = crate::Error;
-
-    fn try_from(string: &str) -> Result<ControlField> {
-        let string_lowercase = string.to_lowercase();
-
-        match string_lowercase.as_str() {
-            "package" => Ok(ControlField::Package),
-            "package-type" => Ok(ControlField::PackageType),
-            "version" => Ok(ControlField::Version),
-            "maintainer" => Ok(ControlField::Maintainer),
-            "description" => Ok(ControlField::Description),
-            "section" => Ok(ControlField::Section),
-            "priority" => Ok(ControlField::Priority),
-            "installed-size" => Ok(ControlField::InstalledSize),
-            "essential" => Ok(ControlField::Essential),
-            "build-essential" => Ok(ControlField::BuildEssential),
-            "architecture" => Ok(ControlField::Architecture),
-            "origin" => Ok(ControlField::Origin),
-            "bugs" => Ok(ControlField::Bugs),
-            _ => Err(Error::UnknownControlField)
-        }
-    }
-}
-
-impl TryFrom<&str> for PackageType {
-    type Error = crate::Error;
-
-    fn try_from(string: &str) -> Result<PackageType> {
-        match string.to_lowercase().as_str() {
-            "deb" => Ok(PackageType::Deb),
-            "udeb" => Ok(PackageType::UDeb),
-            _ => Err(Error::InvalidPackageType)
-        }
-    }
-}
-
-impl Into<&str> for PackageType {
-    fn into(self) -> &'static str {
-        match self {
-            PackageType::Deb => "deb",
-            PackageType::UDeb => "udeb"
-        }
-    }
-}
-
-pub struct DebControl {
-    name: String,
-    pkgtype: PackageType,
-    version: String,
-    maintainer: String,
-    arch: String,
-}
-
-impl DebControl {
-    pub fn parse<R: Read>(reader: R) -> Result<DebControl> {
+    pub fn parse<R: Read>(reader: R) -> Result<Control> {
         let buf_reader = BufReader::new(reader);
+        let mut lines = buf_reader.lines();
 
-        let mut ctrl = DebControl {
-            name: String::default(),
-            pkgtype: PackageType::Deb,
-            version: String::default(),
-            maintainer: String::default(),
-            arch: String::default()
+        let mut ctrl = Control::new();
+
+        let comment_regex = Regex::new(r"^#.*$").unwrap();
+        let continuation_regex = Regex::new(r"^\s+(?P<continuation>\S.*)$").unwrap();
+        let paragraph_sep_regex = Regex::new(r"^\s*$").unwrap();
+        let field_regex = Regex::new(r"(?P<field_name>\w+):(?P<field_value>.*)$").unwrap();
+
+        let mut curr_name: String = String::default();
+
+        loop {
+            let line = match lines.next() {
+                Some(Ok(line)) => line,
+                Some(Err(e)) => return Err(Error::Io(e)),
+                None => break // EOF
+            };
+
+            if comment_regex.is_match(&line) {
+                continue;
+            }
+
+            if paragraph_sep_regex.is_match(&line) {
+                // Save off paragraph
+                // TODO: This is technically an error but ignoring for now
+                continue;
+            }
+
+            if let Some(captures) = field_regex.captures(&line) {
+                let field_name = captures.name("field_name").unwrap().as_str().trim();
+                let field_value = captures.name("field_value").unwrap().as_str().trim();
+
+                let mut data = std::vec::Vec::default();
+                data.push(field_value.to_owned());
+                ctrl.paragraph.insert(field_name.to_lowercase(), data);
+                curr_name = field_name.to_lowercase();
+            }
+
+            if let Some(captures) = continuation_regex.captures(&line) {
+                let continuation = captures.name("continuation").unwrap().as_str();
+                let data = ctrl.paragraph.get_mut(&curr_name).unwrap();
+                data.push(continuation.to_owned());
+            }
+
         };
 
-        for line in buf_reader.lines() {
-            let line = line.unwrap();
-
-            let split: std::vec::Vec<&str> = line.splitn(2, ":").collect();
-            if split.len() == 2 {
-                let field_tag = split[0].to_lowercase();
-                let field_text = split[1].trim();
-                let field_tag = match ControlField::try_from(field_tag.as_str()) {
-                    Ok(field_tag) => field_tag,
-                    Err(_e) => continue
-                };
-
-                match field_tag {
-                    ControlField::Package => ctrl.set_name(field_text),
-                    ControlField::PackageType => ctrl.set_package_type(field_text)?,
-                    ControlField::Version => ctrl.set_version(field_text),
-                    ControlField::Maintainer => ctrl.set_maintainer(field_text),
-                    ControlField::Architecture => ctrl.set_arch(field_text),
-                    _ => ()
-                };
-            }
+        if !ctrl.paragraph.contains_key("package") {
+            return Err(Error::MissingPackageName);
         }
+
+        if !ctrl.paragraph.contains_key("version") {
+            return Err(Error::MissingPackageVersion);
+        }
+
         Ok(ctrl)
+
     }
 
     pub fn name(&self) -> &str {
-        self.name.as_str()
-    }
-
-    pub fn package_type(&self) -> PackageType {
-        self.pkgtype
+        &self.paragraph.get("package").unwrap()[0]
     }
 
     pub fn version(&self) -> &str {
-        self.version.as_str()
-    }
-
-    fn set_name(&mut self, name: &str) {
-        self.name.insert_str(0, name);
-    }
-
-    fn set_package_type(&mut self, package_type: &str) -> Result<()> {
-        let pkgtype = PackageType::try_from(package_type)?;
-        self.pkgtype = pkgtype;
-        Ok(())
-    }
-
-    fn set_version(&mut self, version: &str) {
-        self.version.insert_str(0, version);
-    }
-
-    fn set_maintainer(&mut self, maintainer: &str) {
-        self.maintainer.insert_str(0, maintainer);
-    }
-
-    fn set_arch(&mut self, arch: &str) {
-        self.arch.insert_str(0, arch);
+        &self.paragraph.get("version").unwrap()[0]
     }
 }
 
@@ -179,27 +93,7 @@ mod tests {
     use assert_matches::assert_matches;
 
     #[test]
-    fn properly_parse_package_type () {
-        let pkgtype = "deb";
-        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::Deb);
-
-        let pkgtype = "DEB";
-        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::Deb);
-
-        let pkgtype = "udeb";
-        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::UDeb);
-
-        let pkgtype = "UDEB";
-        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::UDeb);
-
-        let pkgtype = PackageType::Deb;
-        let pkgtype: &'static str = pkgtype.into();
-        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::Deb);
-
-        let pkgtype = PackageType::UDeb;
-        let pkgtype: &'static str = pkgtype.into();
-        assert!(PackageType::try_from(pkgtype).unwrap() == PackageType::UDeb);
-
-        assert_matches!(PackageType::try_from("wrong").unwrap_err(), Error::InvalidPackageType);
+    fn empty_control_file_fails () {
+        assert!(Control::parse("".as_bytes()).is_err());
     }
 }
