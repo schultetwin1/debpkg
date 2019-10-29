@@ -36,7 +36,10 @@ fn ar_with_out_debian_binary_fails_parse() {
     drop(file);
 
     let pkg_result = debpkg::DebPkg::parse(&reader);
-    assert!(pkg_result.is_err(), "Should fail to parse ar without debian-binary file");
+    assert!(
+        pkg_result.is_err(),
+        "Should fail to parse ar without debian-binary file"
+    );
 }
 
 #[test]
@@ -50,7 +53,10 @@ fn ar_with_wrong_debian_binary_content_fails_parse() {
     drop(file);
 
     let pkg_result = debpkg::DebPkg::parse(&reader);
-    assert!(pkg_result.is_err(), "Should fail to parse ar with debian-binary file with the wrong version");
+    assert!(
+        pkg_result.is_err(),
+        "Should fail to parse ar with debian-binary file with the wrong version"
+    );
 }
 
 #[test]
@@ -64,7 +70,10 @@ fn ar_with_only_debian_binary_fails_parse() {
     drop(file);
 
     let pkg_result = debpkg::DebPkg::parse(&reader);
-    assert!(pkg_result.is_err(), "Should fail to parse ar with only debian binary");
+    assert!(
+        pkg_result.is_err(),
+        "Should fail to parse ar with only debian binary"
+    );
 }
 
 #[test]
@@ -79,12 +88,18 @@ fn ar_with_empty_control_tar_fails_parse() {
     let control_tar = tar::Builder::new(std::vec::Vec::new());
     let control_tar = control_tar.into_inner().unwrap();
 
-    let header = ar::Header::new("control.tar".as_bytes().to_vec(), u64::try_from(control_tar.len()).unwrap());
+    let header = ar::Header::new(
+        "control.tar".as_bytes().to_vec(),
+        u64::try_from(control_tar.len()).unwrap(),
+    );
     archive.append(&header, &control_tar[..]).unwrap();
     drop(file);
 
     let pkg_result = debpkg::DebPkg::parse(&reader);
-    assert!(pkg_result.is_err(), "Should fail to parse ar with only debian binary");
+    assert!(
+        pkg_result.is_err(),
+        "Should fail to parse ar with only debian binary"
+    );
 }
 
 #[test]
@@ -101,15 +116,27 @@ fn ar_with_empty_control_fails_parse() {
     header.set_cksum();
 
     let mut control_tar = tar::Builder::new(std::vec::Vec::new());
-    control_tar.append_data(&mut header, std::path::Path::new("control"), "control".as_bytes()).unwrap();
+    control_tar
+        .append_data(
+            &mut header,
+            std::path::Path::new("control"),
+            "control".as_bytes(),
+        )
+        .unwrap();
     let control_tar = control_tar.into_inner().unwrap();
 
-    let header = ar::Header::new("control.tar".as_bytes().to_vec(), u64::try_from(control_tar.len()).unwrap());
+    let header = ar::Header::new(
+        "control.tar".as_bytes().to_vec(),
+        u64::try_from(control_tar.len()).unwrap(),
+    );
     archive.append(&header, &control_tar[..]).unwrap();
     drop(file);
 
     let pkg_result = debpkg::DebPkg::parse(&reader);
-    assert!(pkg_result.is_err(), "Should fail to parse ar with only debian binary");
+    assert!(
+        pkg_result.is_err(),
+        "Should fail to parse ar with only debian binary"
+    );
 }
 
 #[test]

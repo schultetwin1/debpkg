@@ -10,12 +10,14 @@ type Paragraph = std::collections::HashMap<String, Vec<String>>;
 
 #[derive(Debug)]
 pub struct Control {
-    paragraph: Paragraph
+    paragraph: Paragraph,
 }
 
 impl Control {
     fn new() -> Control {
-        Control { paragraph: Paragraph::default() }
+        Control {
+            paragraph: Paragraph::default(),
+        }
     }
 
     pub fn parse<R: Read>(reader: R) -> Result<Control> {
@@ -35,7 +37,7 @@ impl Control {
             let line = match lines.next() {
                 Some(Ok(line)) => line,
                 Some(Err(e)) => return Err(Error::Io(e)),
-                None => break // EOF
+                None => break, // EOF
             };
 
             if comment_regex.is_match(&line) {
@@ -66,8 +68,7 @@ impl Control {
                 let data = ctrl.paragraph.get_mut(&curr_name).unwrap();
                 data.push(continuation.to_owned());
             }
-
-        };
+        }
 
         if !ctrl.paragraph.contains_key("package") {
             return Err(Error::MissingPackageName);
@@ -78,7 +79,6 @@ impl Control {
         }
 
         Ok(ctrl)
-
     }
 
     pub fn name(&self) -> &str {
@@ -92,11 +92,10 @@ impl Control {
     pub fn get(&self, field_name: &str) -> Option<&str> {
         match self.paragraph.get(field_name.to_lowercase().as_str()) {
             Some(lines) => Some(&lines[0]),
-            None => None
+            None => None,
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -104,7 +103,7 @@ mod tests {
     use assert_matches::assert_matches;
 
     #[test]
-    fn empty_control_file_fails () {
+    fn empty_control_file_fails() {
         assert!(Control::parse("".as_bytes()).is_err());
     }
 
@@ -129,7 +128,10 @@ mod tests {
 
     #[test]
     fn proper_description_parse() {
-        let ctrl = Control::parse("package: name\nversion: 1.8.2\nDescription: short\n very\n long".as_bytes()).unwrap();
+        let ctrl = Control::parse(
+            "package: name\nversion: 1.8.2\nDescription: short\n very\n long".as_bytes(),
+        )
+        .unwrap();
         assert!(ctrl.name() == "name");
         assert!(ctrl.version() == "1.8.2");
         let desc = ctrl.paragraph.get("description").unwrap();
@@ -140,7 +142,8 @@ mod tests {
 
     #[test]
     fn control_starting_with_continuation_fails() {
-        let err = Control::parse(" continue\npackage: name\nversion: 1.8.2".as_bytes()).unwrap_err();
+        let err =
+            Control::parse(" continue\npackage: name\nversion: 1.8.2".as_bytes()).unwrap_err();
         assert_matches!(err, Error::InvalidControlFile);
     }
 }

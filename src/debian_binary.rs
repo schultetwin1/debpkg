@@ -1,4 +1,3 @@
-
 use std::io::Read;
 use std::string::String;
 
@@ -9,7 +8,7 @@ use regex::Regex;
 #[derive(Debug)]
 pub struct DebianBinaryVersion {
     pub major: u32,
-    pub minor: u32
+    pub minor: u32,
 }
 
 pub fn parse_debian_binary_contents<R: Read>(stream: &mut R) -> Result<DebianBinaryVersion> {
@@ -20,14 +19,12 @@ pub fn parse_debian_binary_contents<R: Read>(stream: &mut R) -> Result<DebianBin
     let re = Regex::new(r"2\.(\d{1,3})\n").unwrap();
 
     match re.captures(buf.as_str()) {
-        Some(captures) => {
-            Ok(DebianBinaryVersion {major: 2, minor: captures[1].parse::<u32>().unwrap()})
-        },
-        None => {
-            Err(Error::InvalidVersion)
-        }
+        Some(captures) => Ok(DebianBinaryVersion {
+            major: 2,
+            minor: captures[1].parse::<u32>().unwrap(),
+        }),
+        None => Err(Error::InvalidVersion),
     }
-
 }
 
 #[cfg(test)]

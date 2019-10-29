@@ -7,16 +7,18 @@ mod control;
 pub use control::Control;
 
 mod debian_binary;
-use debian_binary::{DebianBinaryVersion, parse_debian_binary_contents};
+use debian_binary::{parse_debian_binary_contents, DebianBinaryVersion};
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct DebPkg<R: Seek + Read> {
     archive: ar::Archive<R>,
-    control: Control
+    control: Control,
 }
 
-fn extract_debian_binary<R: Read + Seek>(archive: &mut ar::Archive<R>) -> Result<DebianBinaryVersion> {
+fn extract_debian_binary<R: Read + Seek>(
+    archive: &mut ar::Archive<R>,
+) -> Result<DebianBinaryVersion> {
     let identifier = "debian-binary";
 
     if archive.count_entries()? == 0 {
@@ -35,15 +37,16 @@ fn extract_debian_binary<R: Read + Seek>(archive: &mut ar::Archive<R>) -> Result
 fn untar_control_data<R: Read>(tar_reader: R) -> Result<Control> {
     let mut tar = tar::Archive::new(tar_reader);
     let entries = tar.entries()?;
-    let control_entry = entries.filter_map(|x| x.ok()).filter(|entry| entry.path().is_ok()).find(|entry| {
-        let path = entry.path().unwrap();
-        path == std::path::Path::new("./control")
-    });
+    let control_entry = entries
+        .filter_map(|x| x.ok())
+        .filter(|entry| entry.path().is_ok())
+        .find(|entry| {
+            let path = entry.path().unwrap();
+            path == std::path::Path::new("./control")
+        });
     match control_entry {
-        Some(control) => {
-            Control::parse(control)
-        },
-        None => Err(Error::MissingControlFile)
+        Some(control) => Control::parse(control),
+        None => Err(Error::MissingControlFile),
     }
 }
 
@@ -54,26 +57,20 @@ fn extract_control_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<Control
                 let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
 
                 match entry_ident {
-                    "control.tar" => {
-                        untar_control_data(entry)
-                    },
+                    "control.tar" => untar_control_data(entry),
                     "control.tar.gz" => {
                         let reader = flate2::read::GzDecoder::new(entry);
                         untar_control_data(reader)
-                    },
+                    }
                     "control.tar.xz" => {
                         let reader = xz2::read::XzDecoder::new_multi_decoder(entry);
                         untar_control_data(reader)
-                    },
-                    "control.tar.zst" => unimplemented!(),
-                    _ => {
-                        Err(Error::MissingControlArchive)
                     }
+                    "control.tar.zst" => unimplemented!(),
+                    _ => Err(Error::MissingControlArchive),
                 }
-            },
-            Err(err) => {
-                Err(Error::Io(err))
             }
+            Err(err) => Err(Error::Io(err)),
         }
     } else {
         Err(Error::MissingControlArchive)
@@ -87,10 +84,7 @@ impl<'a, R: Read + Seek> DebPkg<R> {
         extract_debian_binary(&mut archive)?;
         let control = extract_control_data(&mut archive)?;
 
-        Ok(DebPkg {
-            archive,
-            control
-        })
+        Ok(DebPkg { archive, control })
     }
 
     pub fn unpack<P: AsRef<std::path::Path>>(&mut self, dst: P) -> Result<()> {
@@ -102,23 +96,21 @@ impl<'a, R: Read + Seek> DebPkg<R> {
                 let mut tar = tar::Archive::new(entry);
                 tar.unpack(dst)?;
                 Ok(())
-            },
+            }
             "data.tar.gz" => {
                 let gz = flate2::read::GzDecoder::new(entry);
                 let mut tar = tar::Archive::new(gz);
                 tar.unpack(dst)?;
                 Ok(())
-            },
+            }
             "data.tar.xz" => {
                 let xz = xz2::read::XzDecoder::new_multi_decoder(entry);
                 let mut tar = tar::Archive::new(xz);
                 tar.unpack(dst)?;
                 Ok(())
-            },
-            "data.tar.zst" => unimplemented!(),
-            _ => {
-                Err(Error::MissingDataArchive)
             }
+            "data.tar.zst" => unimplemented!(),
+            _ => Err(Error::MissingDataArchive),
         }
     }
 
