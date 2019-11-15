@@ -157,6 +157,11 @@ fn libgssglue_utils_parses() {
     let libgssglue_deb = std::fs::File::open(libgssglue_deb_path).unwrap();
 
     let mut pkg = debpkg::DebPkg::parse(libgssglue_deb).unwrap();
+    assert!(pkg.name() == "libgssglue1");
+    assert!(pkg.version() == "0.3-4");
+    assert!(pkg.get("Architecture").unwrap() == "amd64");
+    assert!(pkg.get("ARCHitecture").unwrap() == "amd64");
+    assert!(pkg.get("BLAH").is_none());
 
     let dir = tempfile::TempDir::new().unwrap();
     pkg.unpack(dir).unwrap();

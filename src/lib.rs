@@ -1,18 +1,55 @@
+//! # debpkg
+//!
+//! A library to parse binary debian packages
+//! 
+//! This library provides utilties to parse [binary debian
+//! packages](https://www.debian.org/doc/manuals/debian-faq/ch-pkg_basics.en.html#s-deb-format)
+//! abstracted over a reader. This API provides a streaming interface to avoid
+//! loading the entire debian package into RAM.
+//! 
+//! This library only parses binary debian packages. It does not attempt to
+//! write binary debian packages.
+//! 
+//! # Supported Debian Package Versions
+//! 
+//! This package only supports version 2.0 of debian packages. Older versions
+//! are not currently supported.
+//! 
+//! # Examples
+//! 
+//! Parsing a debian package
+//! 
+//! ```no_run
+//! let mut pkg = debpkg::DebPkg::parse("test.deb").unwrap();
+//! println("Package Name: {}", pkg.name());
+//! println("Package Version: {}", pkg.version());
+//! let arch = pkg.get("Architecture").unwrap();
+//! println("Package Architecture: {}", arch);
+//! let dir = tempfile::TempDir::new().unwrap();
+//! pkg.unpack(dir).unwrap();
+//! ```
+
+
 use std::io::{Read, Seek};
 
 mod error;
-use error::Error;
+pub use error::Error;
 
 mod control;
-pub use control::Control;
+use control::Control;
 
 mod debian_binary;
 use debian_binary::{parse_debian_binary_contents, DebianBinaryVersion};
 
-pub type Result<T> = std::result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
+/// A debian package represented by the control data the archive holding all the
+/// information
 pub struct DebPkg<R: Seek + Read> {
+    /// The ar archive in which the debian package is contained
     archive: ar::Archive<R>,
+
+    /// The deb-control information about the debian package
     control: Control,
 }
 
@@ -78,6 +115,20 @@ fn extract_control_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<Control
 }
 
 impl<'a, R: Read + Seek> DebPkg<R> {
+    /// Parses a debian package out of reader
+    /// 
+    /// # Arguments
+    /// 
+    /// * `reader` - A type which implements `std::io::Read` and `std::io::Seek`
+    ///              and is formatted as an ar archive
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use debpkg::DebPkg;
+    /// let file = std::fs::File::open("test.deb").unwrap();
+    /// let pkg = DebPkg::parse(file).unwrap();
+    /// ```
     pub fn parse(reader: R) -> Result<DebPkg<R>> {
         let mut archive = ar::Archive::new(reader);
 
@@ -87,6 +138,23 @@ impl<'a, R: Read + Seek> DebPkg<R> {
         Ok(DebPkg { archive, control })
     }
 
+    /// Unpacks the filesystem in the debian package
+    /// 
+    /// # Arguments
+    /// 
+    /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
+    /// 
+    /// * `dst` - The path to extract all the files to
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use debpkg::DebPkg;
+    /// let file = std::fs::File::open("test.deb").unwrap();
+    /// let dir = tempfile::TempDir::new().unwrap();
+    /// let mut pkg = DebPkg::parse(file).unwrap();
+    /// pkg.unpack(dir).unwrap();
+    /// ```
     pub fn unpack<P: AsRef<std::path::Path>>(&mut self, dst: P) -> Result<()> {
         let entry = self.archive.jump_to_entry(2)?;
         let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
@@ -114,11 +182,23 @@ impl<'a, R: Read + Seek> DebPkg<R> {
         }
     }
 
+    /// Returns the package name
     pub fn name(&self) -> &str {
         self.control.name()
     }
 
+    /// Returns the package version
     pub fn version(&self) -> &str {
         self.control.version()
+    }
+
+    /// Returns a specific tag in the control file if it exists
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.control.get(key)
+    }
+
+    /// Returns an iterator of all the tags in the control file
+    pub fn control_tags(&self) -> impl Iterator<Item = &str> {
+        self.control.tags()
     }
 }
