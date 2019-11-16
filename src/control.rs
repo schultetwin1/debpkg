@@ -15,15 +15,25 @@ struct Tag(String);
 
 impl PartialEq for Tag {
     fn eq(&self, other: &Self) -> bool {
-        let mut x  = self.0.chars();
-        let mut y = other.0.chars();
-        loop {
-            match (x.next(), y.next()) {
-                (Some(a), Some(b)) if a.to_ascii_lowercase() == b.to_ascii_lowercase() => continue,
-                (None, None) => return true,
-                _ => return false
-            }
-        }
+        self == other.as_ref()
+    }
+}
+
+impl PartialEq<str> for Tag {
+    fn eq(&self, other: &str) -> bool {
+        self.0.eq_ignore_ascii_case(other)
+    }
+}
+
+impl PartialEq<Tag> for str {
+    fn eq(&self, other: &Tag) -> bool {
+        self.eq_ignore_ascii_case(other.0.as_str())
+    }
+}
+
+impl PartialEq<String> for Tag {
+    fn eq(&self, other: &String) -> bool {
+        self == other.as_str()
     }
 }
 
@@ -31,7 +41,9 @@ impl Eq for Tag {}
 
 impl Hash for Tag {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        self.0.to_lowercase().hash(state);
+        for c in self.0.as_bytes() {
+            c.to_ascii_lowercase().hash(state)
+        }
     }
 }
 
