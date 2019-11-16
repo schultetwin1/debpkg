@@ -20,11 +20,12 @@
 //! Parsing a debian package
 //! 
 //! ```no_run
-//! let mut pkg = debpkg::DebPkg::parse("test.deb").unwrap();
-//! println("Package Name: {}", pkg.name());
-//! println("Package Version: {}", pkg.version());
+//! let file = std::fs::File::open("test.deb").unwrap();
+//! let mut pkg = debpkg::DebPkg::parse(file).unwrap();
+//! println!("Package Name: {}", pkg.name());
+//! println!("Package Version: {}", pkg.version());
 //! let arch = pkg.get("Architecture").unwrap();
-//! println("Package Architecture: {}", arch);
+//! println!("Package Architecture: {}", arch);
 //! let dir = tempfile::TempDir::new().unwrap();
 //! pkg.unpack(dir).unwrap();
 //! ```
@@ -200,5 +201,15 @@ impl<'a, R: Read + Seek> DebPkg<R> {
     /// Returns an iterator of all the tags in the control file
     pub fn control_tags(&self) -> impl Iterator<Item = &str> {
         self.control.tags()
+    }
+
+    /// Returns the short description (if it exists)
+    pub fn short_description(&self) -> Option<&str> {
+        self.control.short_description()
+    }
+
+    /// Returns the long description (if it exists)
+    pub fn long_description(&self) -> Option<String> {
+        self.control.long_description()
     }
 }

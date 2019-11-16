@@ -7,7 +7,6 @@ use crate::{Error, Result};
 
 use log::{warn};
 use indexmap::IndexMap;
-use regex::Regex;
 
 // Tag is used to represent the tag of a field in a debian control file. Tag
 // essentially creates a string which is case insensitive.
@@ -71,52 +70,58 @@ impl Control {
 
     pub fn parse<R: Read>(reader: R) -> Result<Control> {
         let buf_reader = BufReader::new(reader);
-        let mut lines = buf_reader.lines();
+        let lines = buf_reader.lines();
 
         let mut ctrl = Control::new();
 
-        let comment_regex = Regex::new(r"^#.*$").unwrap();
-        let continuation_regex = Regex::new(r"^\s+(?P<continuation>\S.*)$").unwrap();
-        let paragraph_sep_regex = Regex::new(r"^\s*$").unwrap();
-        let field_regex = Regex::new(r"^(?P<field_name>[\w-]+):(?P<field_value>.*)$").unwrap();
-
         let mut curr_name: Option<Tag> = None;
 
-        loop {
-            let line = match lines.next() {
-                Some(Ok(line)) => line,
-                Some(Err(e)) => return Err(Error::Io(e)),
-                None => break, // EOF
-            };
+        for line in lines {
+            let line = line?;
 
-            if comment_regex.is_match(&line) {
-                continue;
+            match line.trim_end().chars().nth(0) {
+                Some('#') => {
+                    // Comment line, ignore
+                    continue
+                },
 
-            } else if paragraph_sep_regex.is_match(&line) {
-                // TODO: This is technically an error but ignoring for now
-                warn!("Unexpected paragraph seperation");
-                continue;
+                Some(' ') | Some('\t') => {
+                    // contiuation of the field
+                    match curr_name {
+                        Some(ref name) => {
+                            let continuation = line.trim();
+                            let data = ctrl.paragraph.get_mut(name).unwrap();
+                            data.push(continuation.to_owned());
+                        },
+                        None => return Err(Error::InvalidControlFile)
+                    };
+                },
 
-            } else if let Some(captures) = field_regex.captures(&line) {
-                let field_name = captures.name("field_name").unwrap().as_str().trim();
-                let field_value = captures.name("field_value").unwrap().as_str().trim();
+                Some(_) => {
+                    let line = line.trim();
+                    let mut split = line.splitn(2, ':');
+                    let field_name = match split.next() {
+                        Some(ref field_name) => field_name.trim(),
+                        None => return Err(Error::InvalidControlFile)
+                    };
+                    let field_value = match split.next() {
+                        Some(ref field_name) => field_name.trim(),
+                        None => return Err(Error::InvalidControlFile)
+                    };
+                    let mut data = std::vec::Vec::default();
+                    data.push(field_value.to_owned());
+                    let field_tag: Tag = field_name.into();
+                    ctrl.paragraph.insert(field_tag, data);
+                    let field_tag: Tag = field_name.into();
+                    curr_name = Some(field_tag);
+                },
 
-                let mut data = std::vec::Vec::default();
-                data.push(field_value.to_owned());
-                let field_tag: Tag = field_name.into();
-                ctrl.paragraph.insert(field_tag, data);
-                let field_tag: Tag = field_name.into();
-                curr_name = Some(field_tag);
-
-            } else if let Some(captures) = continuation_regex.captures(&line) {
-                match curr_name {
-                    Some(ref name) => {
-                        let continuation = captures.name("continuation").unwrap().as_str();
-                        let data = ctrl.paragraph.get_mut(name).unwrap();
-                        data.push(continuation.to_owned());
-                    },
-                    None => return Err(Error::InvalidControlFile)
-                };
+                None => {
+                    // Paragraph seperation
+                    // TODO: This is technically an error but ignoring for now
+                    warn!("Unexpected paragraph seperation");
+                    continue;
+                }
             }
         }
 
@@ -137,6 +142,18 @@ impl Control {
 
     pub fn version(&self) -> &str {
         self.get("Version").unwrap()
+    }
+
+    pub fn short_description(&self) -> Option<&str> {
+        self.get("Description")
+    }
+
+    pub fn long_description(&self) -> Option<String> {
+        let desc = self.paragraph.get(&Tag::from("Description"))?;
+        match desc.len() {
+            0 | 1 => None,
+            _ => Some(desc[1..].join("\n"))
+        }
     }
 
     pub fn get(&self, field_name: &str) -> Option<&str> {
@@ -189,10 +206,10 @@ mod tests {
         .unwrap();
         assert!(ctrl.name() == "name");
         assert!(ctrl.version() == "1.8.2");
-        // let desc = ctrl.get("description").unwrap();
-        // assert!(desc[0] == "short");
-        // assert!(desc[1] == "very");
-        // assert!(desc[2] == "long");
+        let desc = ctrl.short_description().unwrap();
+        assert!(desc == "short");
+        let desc = ctrl.long_description().unwrap();
+        assert!(desc == "very\nlong");
     }
 
     #[test]

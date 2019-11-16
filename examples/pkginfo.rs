@@ -40,6 +40,12 @@ fn main() {
     let tags = pkg.control_tags();
 
     for tag in tags {
-        println!("{}: {}", tag, pkg.get(tag).unwrap());
+        if tag.to_lowercase() == "description" {
+            println!("{}: {}", tag, pkg.short_description().unwrap());
+            let long_desc = pkg.long_description().unwrap().split('\n').collect::<std::vec::Vec<&str>>().join("\n ");
+            println!(" {}", long_desc);
+        } else {
+            println!("{}: {}", tag, pkg.get(tag).unwrap());
+        }
     }
 }
