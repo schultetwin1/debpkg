@@ -238,4 +238,13 @@ mod tests {
         let tags: std::vec::Vec<&str> = ctrl.tags().collect();
         assert!(tags.len() == 3);
     }
+
+    #[test]
+    fn control_non_continuation_line_fails() {
+        let err = Control::parse(
+            "package: name\nthis is wrong".as_bytes()
+        )
+        .unwrap_err();
+        assert_matches!(err, Error::InvalidControlFile);
+    }
 }
