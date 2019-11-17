@@ -6,34 +6,47 @@ use std::vec::Vec;
 use crate::{Error, Result};
 
 use log::{warn};
-use indexmap::IndexMap;
+use indexmap::{Equivalent, IndexMap};
 
 // Tag is used to represent the tag of a field in a debian control file. Tag
 // essentially creates a string which is case insensitive.
 #[derive(Debug)]
 struct Tag(String);
 
+// UncasedStr used to be able to search a hash map of tags without creating a
+// new String.
+struct UncasedStr<'a>(&'a str);
+
+impl<'a> Hash for UncasedStr<'a> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        for c in self.0.as_bytes() {
+            c.to_ascii_lowercase().hash(state)
+        }
+    }
+
+}
+
+impl<'a> From<&'a str> for UncasedStr<'a> {
+    fn from(s: &'a str) -> Self {
+        UncasedStr(s)
+    }
+}
+
 impl PartialEq for Tag {
     fn eq(&self, other: &Self) -> bool {
-        self == other.as_ref()
+        self.0.eq_ignore_ascii_case(&other.0)
     }
 }
 
-impl PartialEq<str> for Tag {
-    fn eq(&self, other: &str) -> bool {
-        self.0.eq_ignore_ascii_case(other)
+impl<'a> PartialEq<UncasedStr<'a>> for Tag {
+    fn eq(&self, other: &UncasedStr) -> bool {
+        self.0.eq_ignore_ascii_case(&other.0)
     }
 }
 
-impl PartialEq<Tag> for str {
+impl<'a> PartialEq<Tag> for UncasedStr<'a> {
     fn eq(&self, other: &Tag) -> bool {
-        self.eq_ignore_ascii_case(other.0.as_str())
-    }
-}
-
-impl PartialEq<String> for Tag {
-    fn eq(&self, other: &String) -> bool {
-        self == other.as_str()
+        self.0.eq_ignore_ascii_case(other.0.as_str())
     }
 }
 
@@ -41,9 +54,9 @@ impl Eq for Tag {}
 
 impl Hash for Tag {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        for c in self.0.as_bytes() {
-            c.to_ascii_lowercase().hash(state)
-        }
+        // Both UncasedStr and Tag must hash the same way in order for to use
+        // the Equivalent trait of IndexMap
+        UncasedStr::from(self.as_ref()).hash(state)
     }
 }
 
@@ -62,6 +75,18 @@ impl From<String> for Tag {
 impl AsRef<str> for Tag {
     fn as_ref(&self) -> &str {
         self.0.as_ref()
+    }
+}
+
+impl<'a> Equivalent<UncasedStr<'a>> for Tag {
+    fn equivalent(&self, key: &UncasedStr) -> bool {
+        self == key
+    }
+}
+
+impl<'a> Equivalent<Tag> for UncasedStr<'a> {
+    fn equivalent(&self, key: &Tag) -> bool {
+        self == key
     }
 }
 
@@ -137,11 +162,11 @@ impl Control {
             }
         }
 
-        if !ctrl.paragraph.contains_key(&Tag::from("package")) {
+        if !ctrl.paragraph.contains_key(&UncasedStr::from("package")) {
             return Err(Error::MissingPackageName);
         }
 
-        if !ctrl.paragraph.contains_key(&Tag::from("version")) {
+        if !ctrl.paragraph.contains_key(&UncasedStr::from("version")) {
             return Err(Error::MissingPackageVersion);
         }
 
@@ -161,7 +186,7 @@ impl Control {
     }
 
     pub fn long_description(&self) -> Option<String> {
-        let desc = self.paragraph.get(&Tag::from("Description"))?;
+        let desc = self.paragraph.get(&UncasedStr::from("Description"))?;
         match desc.len() {
             0 | 1 => None,
             _ => Some(desc[1..].join("\n"))
@@ -169,8 +194,7 @@ impl Control {
     }
 
     pub fn get(&self, field_name: &str) -> Option<&str> {
-        let field_name = Tag::from(field_name);
-        match self.paragraph.get(&field_name) {
+        match self.paragraph.get(&UncasedStr::from(field_name)) {
             Some(lines) => Some(&lines[0]),
             None => None,
         }
