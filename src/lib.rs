@@ -45,7 +45,7 @@ type Result<T> = std::result::Result<T, Error>;
 
 /// A debian package represented by the control data the archive holding all the
 /// information
-pub struct DebPkg<R: Seek + Read> {
+pub struct DebPkg<R: Read> {
     /// The ar archive in which the debian package is contained
     archive: ar::Archive<R>,
 
@@ -53,19 +53,13 @@ pub struct DebPkg<R: Seek + Read> {
     control: Control,
 }
 
-fn extract_debian_binary<R: Read + Seek>(
-    archive: &mut ar::Archive<R>,
+fn validate_debian_binary<'a, R: 'a + Read>(
+    entry: &mut ar::Entry<'a, R>,
 ) -> Result<DebianBinaryVersion> {
     let identifier = "debian-binary";
 
-    if archive.count_entries()? == 0 {
-        return Err(Error::MissingDebianBinary);
-    }
-
-    let mut entry = archive.jump_to_entry(0).unwrap();
-
     if entry.header().identifier() == identifier.as_bytes() {
-        parse_debian_binary_contents(&mut entry)
+        parse_debian_binary_contents(entry)
     } else {
         Err(Error::MissingDebianBinary)
     }
@@ -87,30 +81,21 @@ fn untar_control_data<R: Read>(tar_reader: R) -> Result<Control> {
     }
 }
 
-fn extract_control_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<Control> {
-    if let Some(entry_result) = archive.next_entry() {
-        match entry_result {
-            Ok(entry) => {
-                let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
+fn extract_control_data<'a, R: 'a + Read>(entry: &mut ar::Entry<'a, R>) -> Result<Control> {
+    let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
 
-                match entry_ident {
-                    "control.tar" => untar_control_data(entry),
-                    "control.tar.gz" => {
-                        let reader = flate2::read::GzDecoder::new(entry);
-                        untar_control_data(reader)
-                    }
-                    "control.tar.xz" => {
-                        let reader = xz2::read::XzDecoder::new_multi_decoder(entry);
-                        untar_control_data(reader)
-                    }
-                    "control.tar.zst" => unimplemented!(),
-                    _ => Err(Error::MissingControlArchive),
-                }
-            }
-            Err(err) => Err(Error::Io(err)),
+    match entry_ident {
+        "control.tar" => untar_control_data(entry),
+        "control.tar.gz" => {
+            let reader = flate2::read::GzDecoder::new(entry);
+            untar_control_data(reader)
         }
-    } else {
-        Err(Error::MissingControlArchive)
+        "control.tar.xz" => {
+            let reader = xz2::read::XzDecoder::new_multi_decoder(entry);
+            untar_control_data(reader)
+        }
+        "control.tar.zst" => unimplemented!(),
+        _ => Err(Error::MissingControlArchive),
     }
 }
 
@@ -124,7 +109,7 @@ fn list_files_in_tar<'a, R: 'a + Read>(
     Ok(paths)
 }
 
-impl<'a, R: Read + Seek> DebPkg<R> {
+impl<R: Read> DebPkg<R> {
     /// Parses a debian package out of reader
     ///
     /// # Arguments
@@ -141,13 +126,63 @@ impl<'a, R: Read + Seek> DebPkg<R> {
     /// ```
     pub fn parse(reader: R) -> Result<DebPkg<R>> {
         let mut archive = ar::Archive::new(reader);
+        let mut debian_binary_entry = match archive.next_entry() {
+            Some(Ok(entry)) => entry,
+            Some(Err(err)) => return Err(Error::Io(err)),
+            None => return Err(Error::MissingDebianBinary),
+        };
+        validate_debian_binary(&mut debian_binary_entry)?;
+        drop(debian_binary_entry);
 
-        extract_debian_binary(&mut archive)?;
-        let control = extract_control_data(&mut archive)?;
+        let mut control_entry = match archive.next_entry() {
+            Some(Ok(entry)) => entry,
+            Some(Err(err)) => return Err(Error::Io(err)),
+            None => return Err(Error::MissingControlArchive),
+        };
+        let control = extract_control_data(&mut control_entry)?;
+        drop(control_entry);
+
+        match archive.next_entry() {
+            Some(Ok(_entry)) => {}
+            Some(Err(err)) => return Err(Error::Io(err)),
+            None => return Err(Error::MissingDataArchive),
+        };
 
         Ok(DebPkg { archive, control })
     }
 
+    /// Returns the package name
+    pub fn name(&self) -> &str {
+        self.control.name()
+    }
+
+    /// Returns the package version
+    pub fn version(&self) -> &str {
+        self.control.version()
+    }
+
+    /// Returns a specific tag in the control file if it exists
+    pub fn get(&self, key: &str) -> Option<&str> {
+        self.control.get(key)
+    }
+
+    /// Returns an iterator of all the tags in the control file
+    pub fn control_tags(&self) -> impl Iterator<Item = &str> {
+        self.control.tags()
+    }
+
+    /// Returns the short description (if it exists)
+    pub fn short_description(&self) -> Option<&str> {
+        self.control.short_description()
+    }
+
+    /// Returns the long description (if it exists)
+    pub fn long_description(&self) -> Option<String> {
+        self.control.long_description()
+    }
+}
+
+impl<R: Read + Seek> DebPkg<R> {
     /// Unpacks the filesystem in the debian package
     ///
     /// # Arguments
@@ -231,35 +266,5 @@ impl<'a, R: Read + Seek> DebPkg<R> {
             "data.tar.zst" => unimplemented!(),
             _ => Err(Error::MissingDataArchive),
         }
-    }
-
-    /// Returns the package name
-    pub fn name(&self) -> &str {
-        self.control.name()
-    }
-
-    /// Returns the package version
-    pub fn version(&self) -> &str {
-        self.control.version()
-    }
-
-    /// Returns a specific tag in the control file if it exists
-    pub fn get(&self, key: &str) -> Option<&str> {
-        self.control.get(key)
-    }
-
-    /// Returns an iterator of all the tags in the control file
-    pub fn control_tags(&self) -> impl Iterator<Item = &str> {
-        self.control.tags()
-    }
-
-    /// Returns the short description (if it exists)
-    pub fn short_description(&self) -> Option<&str> {
-        self.control.short_description()
-    }
-
-    /// Returns the long description (if it exists)
-    pub fn long_description(&self) -> Option<String> {
-        self.control.long_description()
     }
 }
