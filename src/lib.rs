@@ -115,6 +115,13 @@ fn extract_control_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<Control
     }
 }
 
+fn list_files_in_tar<'a, R: 'a + Read>(tar: &mut tar::Archive<R>) -> Result<Vec<std::path::PathBuf>> {
+    let entries = tar.entries()?;
+    let paths: Vec<std::path::PathBuf> = entries.map(|e| e.unwrap().path().unwrap().into_owned()).collect();
+    Ok(paths)
+}
+
+
 impl<'a, R: Read + Seek> DebPkg<R> {
     /// Parses a debian package out of reader
     /// 
@@ -178,6 +185,47 @@ impl<'a, R: Read + Seek> DebPkg<R> {
                 tar.unpack(dst)?;
                 Ok(())
             }
+            "data.tar.zst" => unimplemented!(),
+            _ => Err(Error::MissingDataArchive),
+        }
+    }
+
+    /// Lists the files in the debian package by extraction path
+    /// 
+    /// # Arguments
+    /// 
+    /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use debpkg::DebPkg;
+    /// let file = std::fs::File::open("test.deb").unwrap();
+    /// let mut pkg = DebPkg::parse(file).unwrap();
+    /// let paths = pkg.list_files().unwrap();
+    /// for path in paths {
+    ///     println!("{}", path.display());
+    /// }
+    /// ```
+    pub fn list_files(&mut self) -> Result<Vec<std::path::PathBuf>> {
+        let entry = self.archive.jump_to_entry(2)?;
+        let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
+
+        match entry_ident {
+            "data.tar" => {
+                let mut tar = tar::Archive::new(entry); 
+                list_files_in_tar(&mut tar)
+            },
+            "data.tar.gz" => {
+                let gz = flate2::read::GzDecoder::new(entry);
+                let mut tar = tar::Archive::new(gz);
+                list_files_in_tar(&mut tar)
+            },
+            "data.tar.xz" => {
+                let xz = xz2::read::XzDecoder::new_multi_decoder(entry);
+                let mut tar = tar::Archive::new(xz);
+                list_files_in_tar(&mut tar)
+            },
             "data.tar.zst" => unimplemented!(),
             _ => Err(Error::MissingDataArchive),
         }
