@@ -1,12 +1,12 @@
+use std::hash::{Hash, Hasher};
 use std::io::{BufRead, BufReader, Read};
 use std::string::String;
-use std::hash::{Hash, Hasher};
 use std::vec::Vec;
 
 use crate::{Error, Result};
 
-use log::{warn};
 use indexmap::{Equivalent, IndexMap};
+use log::warn;
 
 // Tag is used to represent the tag of a field in a debian control file. Tag
 // essentially creates a string which is case insensitive.
@@ -112,8 +112,8 @@ impl Control {
             match line.trim_end().chars().nth(0) {
                 Some('#') => {
                     // Comment line, ignore
-                    continue
-                },
+                    continue;
+                }
 
                 Some(' ') | Some('\t') => {
                     // contiuation of the current field
@@ -122,10 +122,10 @@ impl Control {
                             let continuation = line.trim();
                             let data = ctrl.paragraph.get_mut(name).unwrap();
                             data.push(continuation.to_owned());
-                        },
-                        None => return Err(Error::InvalidControlFile)
+                        }
+                        None => return Err(Error::InvalidControlFile),
                     };
-                },
+                }
 
                 Some(_) => {
                     // new field
@@ -133,11 +133,11 @@ impl Control {
                     let mut split = line.splitn(2, ':');
                     let field_name = match split.next() {
                         Some(ref field_name) => field_name.trim(),
-                        None => return Err(Error::InvalidControlFile)
+                        None => return Err(Error::InvalidControlFile),
                     };
                     let field_value = match split.next() {
                         Some(ref field_name) => field_name.trim(),
-                        None => return Err(Error::InvalidControlFile)
+                        None => return Err(Error::InvalidControlFile),
                     };
                     let mut data = std::vec::Vec::default();
                     data.push(field_value.to_owned());
@@ -147,7 +147,7 @@ impl Control {
                     }
                     let field_tag: Tag = field_name.into();
                     curr_name = Some(field_tag);
-                },
+                }
 
                 None => {
                     // Paragraph seperation
@@ -185,7 +185,7 @@ impl Control {
         let desc = self.paragraph.get(&UncasedStrRef::from("Description"))?;
         match desc.len() {
             0 | 1 => None,
-            _ => Some(desc[1..].join("\n"))
+            _ => Some(desc[1..].join("\n")),
         }
     }
 
@@ -197,7 +197,7 @@ impl Control {
     }
 
     pub fn tags(&self) -> impl Iterator<Item = &str> {
-        self.paragraph.keys().map(|i| i.as_ref() )
+        self.paragraph.keys().map(|i| i.as_ref())
     }
 }
 
@@ -253,39 +253,29 @@ mod tests {
 
     #[test]
     fn control_keys_list_everything() {
-        let ctrl = Control::parse(
-            "package: name\nversion: 1.8.2\nTest: a".as_bytes()
-        )
-        .unwrap();
+        let ctrl = Control::parse("package: name\nversion: 1.8.2\nTest: a".as_bytes()).unwrap();
         let tags: std::vec::Vec<&str> = ctrl.tags().collect();
         assert!(tags.len() == 3);
     }
 
     #[test]
     fn control_keys_captures_dash() {
-        let ctrl = Control::parse(
-            "package: name\nversion: 1.8.2\nInstalled-Size: a".as_bytes()
-        )
-        .unwrap();
+        let ctrl =
+            Control::parse("package: name\nversion: 1.8.2\nInstalled-Size: a".as_bytes()).unwrap();
         let tags: std::vec::Vec<&str> = ctrl.tags().collect();
         assert!(tags.len() == 3);
     }
 
     #[test]
     fn control_non_continuation_line_fails() {
-        let err = Control::parse(
-            "package: name\nthis is wrong".as_bytes()
-        )
-        .unwrap_err();
+        let err = Control::parse("package: name\nthis is wrong".as_bytes()).unwrap_err();
         assert_matches!(err, Error::InvalidControlFile);
     }
 
     #[test]
     fn duplicate_fields_fails_parsing() {
-        let err = Control::parse(
-            "package: name\nversion: 1.8.2\npackage: name2".as_bytes()
-        )
-        .unwrap_err();
+        let err =
+            Control::parse("package: name\nversion: 1.8.2\npackage: name2".as_bytes()).unwrap_err();
         assert_matches!(err, Error::InvalidControlFile);
     }
 }

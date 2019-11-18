@@ -1,24 +1,24 @@
 //! # debpkg
 //!
 //! A library to parse binary debian packages
-//! 
+//!
 //! This library provides utilties to parse [binary debian
 //! packages](https://www.debian.org/doc/manuals/debian-faq/ch-pkg_basics.en.html#s-deb-format)
 //! abstracted over a reader. This API provides a streaming interface to avoid
 //! loading the entire debian package into RAM.
-//! 
+//!
 //! This library only parses binary debian packages. It does not attempt to
 //! write binary debian packages.
-//! 
+//!
 //! # Supported Debian Package Versions
-//! 
+//!
 //! This package only supports version 2.0 of debian packages. Older versions
 //! are not currently supported.
-//! 
+//!
 //! # Examples
-//! 
+//!
 //! Parsing a debian package
-//! 
+//!
 //! ```no_run
 //! let file = std::fs::File::open("test.deb").unwrap();
 //! let mut pkg = debpkg::DebPkg::parse(file).unwrap();
@@ -29,7 +29,6 @@
 //! let dir = tempfile::TempDir::new().unwrap();
 //! pkg.unpack(dir).unwrap();
 //! ```
-
 
 use std::io::{Read, Seek};
 
@@ -115,23 +114,26 @@ fn extract_control_data<R: Read>(archive: &mut ar::Archive<R>) -> Result<Control
     }
 }
 
-fn list_files_in_tar<'a, R: 'a + Read>(tar: &mut tar::Archive<R>) -> Result<Vec<std::path::PathBuf>> {
+fn list_files_in_tar<'a, R: 'a + Read>(
+    tar: &mut tar::Archive<R>,
+) -> Result<Vec<std::path::PathBuf>> {
     let entries = tar.entries()?;
-    let paths: Vec<std::path::PathBuf> = entries.map(|e| e.unwrap().path().unwrap().into_owned()).collect();
+    let paths: Vec<std::path::PathBuf> = entries
+        .map(|e| e.unwrap().path().unwrap().into_owned())
+        .collect();
     Ok(paths)
 }
 
-
 impl<'a, R: Read + Seek> DebPkg<R> {
     /// Parses a debian package out of reader
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `reader` - A type which implements `std::io::Read` and `std::io::Seek`
     ///              and is formatted as an ar archive
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// use debpkg::DebPkg;
     /// let file = std::fs::File::open("test.deb").unwrap();
@@ -147,15 +149,15 @@ impl<'a, R: Read + Seek> DebPkg<R> {
     }
 
     /// Unpacks the filesystem in the debian package
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
-    /// 
+    ///
     /// * `dst` - The path to extract all the files to
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// use debpkg::DebPkg;
     /// let file = std::fs::File::open("test.deb").unwrap();
@@ -191,13 +193,13 @@ impl<'a, R: Read + Seek> DebPkg<R> {
     }
 
     /// Lists the files in the debian package by extraction path
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// use debpkg::DebPkg;
     /// let file = std::fs::File::open("test.deb").unwrap();
@@ -213,19 +215,19 @@ impl<'a, R: Read + Seek> DebPkg<R> {
 
         match entry_ident {
             "data.tar" => {
-                let mut tar = tar::Archive::new(entry); 
+                let mut tar = tar::Archive::new(entry);
                 list_files_in_tar(&mut tar)
-            },
+            }
             "data.tar.gz" => {
                 let gz = flate2::read::GzDecoder::new(entry);
                 let mut tar = tar::Archive::new(gz);
                 list_files_in_tar(&mut tar)
-            },
+            }
             "data.tar.xz" => {
                 let xz = xz2::read::XzDecoder::new_multi_decoder(entry);
                 let mut tar = tar::Archive::new(xz);
                 list_files_in_tar(&mut tar)
-            },
+            }
             "data.tar.zst" => unimplemented!(),
             _ => Err(Error::MissingDataArchive),
         }

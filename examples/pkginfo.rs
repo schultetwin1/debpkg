@@ -1,8 +1,8 @@
 extern crate debpkg;
 
 use std::env;
-use std::path::Path;
 use std::fs::File;
+use std::path::Path;
 use std::process;
 
 fn main() {
@@ -22,7 +22,10 @@ fn main() {
     let deb_file = match File::open(deb_path) {
         Ok(file) => file,
         Err(e) => {
-            println!("ERROR: Failed to open debian file \"{}\"", deb_path.display());
+            println!(
+                "ERROR: Failed to open debian file \"{}\"",
+                deb_path.display()
+            );
             println!("       {}", e);
             process::exit(1);
         }
@@ -31,7 +34,10 @@ fn main() {
     let pkg = match debpkg::DebPkg::parse(deb_file) {
         Ok(pkg) => pkg,
         Err(e) => {
-            println!("ERROR: Failed to parse debian file \"{}\"", deb_path.display());
+            println!(
+                "ERROR: Failed to parse debian file \"{}\"",
+                deb_path.display()
+            );
             println!("       {}", e);
             process::exit(1);
         }
@@ -42,7 +48,12 @@ fn main() {
     for tag in tags {
         if tag.to_lowercase() == "description" {
             println!("{}: {}", tag, pkg.short_description().unwrap());
-            let long_desc = pkg.long_description().unwrap().split('\n').collect::<std::vec::Vec<&str>>().join("\n ");
+            let long_desc = pkg
+                .long_description()
+                .unwrap()
+                .split('\n')
+                .collect::<std::vec::Vec<&str>>()
+                .join("\n ");
             println!(" {}", long_desc);
         } else {
             println!("{}: {}", tag, pkg.get(tag).unwrap());
