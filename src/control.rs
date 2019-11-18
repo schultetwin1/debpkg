@@ -13,11 +13,11 @@ use indexmap::{Equivalent, IndexMap};
 #[derive(Debug)]
 struct Tag(String);
 
-// UncasedStr used to be able to search a hash map of tags without creating a
+// UncasedStrRef used to be able to search a hash map of tags without creating a
 // new String.
-struct UncasedStr<'a>(&'a str);
+struct UncasedStrRef<'a>(&'a str);
 
-impl<'a> Hash for UncasedStr<'a> {
+impl<'a> Hash for UncasedStrRef<'a> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         for c in self.0.as_bytes() {
             c.to_ascii_lowercase().hash(state)
@@ -26,9 +26,9 @@ impl<'a> Hash for UncasedStr<'a> {
 
 }
 
-impl<'a> From<&'a str> for UncasedStr<'a> {
+impl<'a> From<&'a str> for UncasedStrRef<'a> {
     fn from(s: &'a str) -> Self {
-        UncasedStr(s)
+        UncasedStrRef(s)
     }
 }
 
@@ -38,13 +38,13 @@ impl PartialEq for Tag {
     }
 }
 
-impl<'a> PartialEq<UncasedStr<'a>> for Tag {
-    fn eq(&self, other: &UncasedStr) -> bool {
+impl<'a> PartialEq<UncasedStrRef<'a>> for Tag {
+    fn eq(&self, other: &UncasedStrRef) -> bool {
         self.0.eq_ignore_ascii_case(&other.0)
     }
 }
 
-impl<'a> PartialEq<Tag> for UncasedStr<'a> {
+impl<'a> PartialEq<Tag> for UncasedStrRef<'a> {
     fn eq(&self, other: &Tag) -> bool {
         self.0.eq_ignore_ascii_case(other.0.as_str())
     }
@@ -54,9 +54,9 @@ impl Eq for Tag {}
 
 impl Hash for Tag {
     fn hash<H: Hasher>(&self, state: &mut H) {
-        // Both UncasedStr and Tag must hash the same way in order for to use
+        // Both UncasedStrRef and Tag must hash the same way in order for to use
         // the Equivalent trait of IndexMap
-        UncasedStr::from(self.as_ref()).hash(state)
+        UncasedStrRef::from(self.as_ref()).hash(state)
     }
 }
 
@@ -78,13 +78,13 @@ impl AsRef<str> for Tag {
     }
 }
 
-impl<'a> Equivalent<UncasedStr<'a>> for Tag {
-    fn equivalent(&self, key: &UncasedStr) -> bool {
+impl<'a> Equivalent<UncasedStrRef<'a>> for Tag {
+    fn equivalent(&self, key: &UncasedStrRef) -> bool {
         self == key
     }
 }
 
-impl<'a> Equivalent<Tag> for UncasedStr<'a> {
+impl<'a> Equivalent<Tag> for UncasedStrRef<'a> {
     fn equivalent(&self, key: &Tag) -> bool {
         self == key
     }
@@ -123,7 +123,7 @@ impl Control {
                 },
 
                 Some(' ') | Some('\t') => {
-                    // contiuation of the field
+                    // contiuation of the current field
                     match curr_name {
                         Some(ref name) => {
                             let continuation = line.trim();
@@ -135,6 +135,7 @@ impl Control {
                 },
 
                 Some(_) => {
+                    // new field
                     let line = line.trim();
                     let mut split = line.splitn(2, ':');
                     let field_name = match split.next() {
@@ -162,11 +163,11 @@ impl Control {
             }
         }
 
-        if !ctrl.paragraph.contains_key(&UncasedStr::from("package")) {
+        if !ctrl.paragraph.contains_key(&UncasedStrRef::from("package")) {
             return Err(Error::MissingPackageName);
         }
 
-        if !ctrl.paragraph.contains_key(&UncasedStr::from("version")) {
+        if !ctrl.paragraph.contains_key(&UncasedStrRef::from("version")) {
             return Err(Error::MissingPackageVersion);
         }
 
@@ -186,7 +187,7 @@ impl Control {
     }
 
     pub fn long_description(&self) -> Option<String> {
-        let desc = self.paragraph.get(&UncasedStr::from("Description"))?;
+        let desc = self.paragraph.get(&UncasedStrRef::from("Description"))?;
         match desc.len() {
             0 | 1 => None,
             _ => Some(desc[1..].join("\n"))
@@ -194,7 +195,7 @@ impl Control {
     }
 
     pub fn get(&self, field_name: &str) -> Option<&str> {
-        match self.paragraph.get(&UncasedStr::from(field_name)) {
+        match self.paragraph.get(&UncasedStrRef::from(field_name)) {
             Some(lines) => Some(&lines[0]),
             None => None,
         }
