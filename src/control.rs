@@ -13,8 +13,8 @@ use indexmap::{Equivalent, IndexMap};
 #[derive(Debug)]
 struct Tag(String);
 
-// UncasedStrRef used to be able to search a hash map of tags without creating a
-// new String.
+// UncasedStrRef is used to be able to search a hash map of tags without
+// creating a new String.
 struct UncasedStrRef<'a>(&'a str);
 
 impl<'a> Hash for UncasedStrRef<'a> {
@@ -23,7 +23,6 @@ impl<'a> Hash for UncasedStrRef<'a> {
             c.to_ascii_lowercase().hash(state)
         }
     }
-
 }
 
 impl<'a> From<&'a str> for UncasedStrRef<'a> {
@@ -63,12 +62,6 @@ impl Hash for Tag {
 impl From<&str> for Tag {
     fn from(s: &str) -> Self {
         Tag(s.to_owned())
-    }
-}
-
-impl From<String> for Tag {
-    fn from(s: String) -> Self {
-        Tag(s)
     }
 }
 
@@ -149,7 +142,9 @@ impl Control {
                     let mut data = std::vec::Vec::default();
                     data.push(field_value.to_owned());
                     let field_tag: Tag = field_name.into();
-                    ctrl.paragraph.insert(field_tag, data);
+                    if let Some(_value) = ctrl.paragraph.insert(field_tag, data) {
+                        return Err(Error::InvalidControlFile);
+                    }
                     let field_tag: Tag = field_name.into();
                     curr_name = Some(field_tag);
                 },
@@ -280,6 +275,15 @@ mod tests {
     fn control_non_continuation_line_fails() {
         let err = Control::parse(
             "package: name\nthis is wrong".as_bytes()
+        )
+        .unwrap_err();
+        assert_matches!(err, Error::InvalidControlFile);
+    }
+
+    #[test]
+    fn duplicate_fields_fails_parsing() {
+        let err = Control::parse(
+            "package: name\nversion: 1.8.2\npackage: name2".as_bytes()
         )
         .unwrap_err();
         assert_matches!(err, Error::InvalidControlFile);
