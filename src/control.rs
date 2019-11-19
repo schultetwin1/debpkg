@@ -101,7 +101,11 @@ impl<'a> Equivalent<Tag> for UncasedStrRef<'a> {
 #[derive(Debug)]
 enum FieldBody {
     Simple(String),
+
+    // Currently binary debian packages don't have any folded fields
+    #[allow(dead_code)]
     Folded(String),
+
     Multiline(String, Vec<String>)
 }
 
