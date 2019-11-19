@@ -151,9 +151,7 @@ impl Control {
                             let continuation = line.trim();
                             let data = ctrl.paragraph.get_mut(name).unwrap();
                             match data {
-                                FieldBody::Simple(_value) => {
-                                    return Err(Error::InvalidControlFile)
-                                },
+                                FieldBody::Simple(_value) => return Err(Error::InvalidControlFile),
                                 FieldBody::Folded(value) => {
                                     value.push(' ');
                                     value.push_str(continuation);
