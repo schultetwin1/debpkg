@@ -15,7 +15,7 @@ pub fn parse_debian_binary_contents<R: Read>(stream: &mut R) -> Result<DebianBin
     stream.read_exact(&mut first_two_bytes)?;
 
     if &first_two_bytes != b"2." {
-        return Err(Error::InvalidVersion)
+        return Err(Error::InvalidVersion);
     }
 
     // note: This limits the largest minor version to 99999. Hopefully we never get above that.
@@ -26,19 +26,19 @@ pub fn parse_debian_binary_contents<R: Read>(stream: &mut R) -> Result<DebianBin
             break;
         }
         if !(byte as char).is_digit(10) {
-            return Err(Error::InvalidVersion)
+            return Err(Error::InvalidVersion);
         }
         if string.is_full() {
-            return Err(Error::InvalidVersion)
+            return Err(Error::InvalidVersion);
         }
         string.push(byte as char);
     }
     let minor = match string.as_str().parse::<u32>() {
         Ok(num) => num,
-        Err(_e) => return Err(Error::InvalidVersion)
+        Err(_e) => return Err(Error::InvalidVersion),
     };
 
-    Ok(DebianBinaryVersion{major: 2, minor})
+    Ok(DebianBinaryVersion { major: 2, minor })
 }
 
 #[cfg(test)]

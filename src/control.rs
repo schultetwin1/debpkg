@@ -208,34 +208,33 @@ mod tests {
 
     #[test]
     fn empty_control_file_fails() {
-        assert!(Control::parse("".as_bytes()).is_err());
+        assert!(Control::parse(&b""[..]).is_err());
     }
 
     #[test]
     fn only_name_fails_parse() {
-        let err = Control::parse("package: name_only".as_bytes()).unwrap_err();
+        let err = Control::parse(&b"package: name_only"[..]).unwrap_err();
         assert_matches!(err, Error::MissingPackageVersion);
     }
 
     #[test]
     fn only_version_fails_parse() {
-        let err = Control::parse("version: 1.8.2".as_bytes()).unwrap_err();
+        let err = Control::parse(&b"version: 1.8.2"[..]).unwrap_err();
         assert_matches!(err, Error::MissingPackageName);
     }
 
     #[test]
     fn name_and_version_parse() {
-        let ctrl = Control::parse("package: name\nversion: 1.8.2".as_bytes()).unwrap();
+        let ctrl = Control::parse(&b"package: name\nversion: 1.8.2"[..]).unwrap();
         assert!(ctrl.name() == "name");
         assert!(ctrl.version() == "1.8.2");
     }
 
     #[test]
     fn proper_description_parse() {
-        let ctrl = Control::parse(
-            "package: name\nversion: 1.8.2\nDescription: short\n very\n long".as_bytes(),
-        )
-        .unwrap();
+        let ctrl =
+            Control::parse(&b"package: name\nversion: 1.8.2\nDescription: short\n very\n long"[..])
+                .unwrap();
         assert!(ctrl.name() == "name");
         assert!(ctrl.version() == "1.8.2");
         let desc = ctrl.short_description().unwrap();
@@ -246,14 +245,13 @@ mod tests {
 
     #[test]
     fn control_starting_with_continuation_fails() {
-        let err =
-            Control::parse(" continue\npackage: name\nversion: 1.8.2".as_bytes()).unwrap_err();
+        let err = Control::parse(&b" continue\npackage: name\nversion: 1.8.2"[..]).unwrap_err();
         assert_matches!(err, Error::InvalidControlFile);
     }
 
     #[test]
     fn control_keys_list_everything() {
-        let ctrl = Control::parse("package: name\nversion: 1.8.2\nTest: a".as_bytes()).unwrap();
+        let ctrl = Control::parse(&b"package: name\nversion: 1.8.2\nTest: a"[..]).unwrap();
         let tags: std::vec::Vec<&str> = ctrl.tags().collect();
         assert!(tags.len() == 3);
     }
@@ -261,21 +259,21 @@ mod tests {
     #[test]
     fn control_keys_captures_dash() {
         let ctrl =
-            Control::parse("package: name\nversion: 1.8.2\nInstalled-Size: a".as_bytes()).unwrap();
+            Control::parse(&b"package: name\nversion: 1.8.2\nInstalled-Size: a"[..]).unwrap();
         let tags: std::vec::Vec<&str> = ctrl.tags().collect();
         assert!(tags.len() == 3);
     }
 
     #[test]
     fn control_non_continuation_line_fails() {
-        let err = Control::parse("package: name\nthis is wrong".as_bytes()).unwrap_err();
+        let err = Control::parse(&b"package: name\nthis is wrong"[..]).unwrap_err();
         assert_matches!(err, Error::InvalidControlFile);
     }
 
     #[test]
     fn duplicate_fields_fails_parsing() {
         let err =
-            Control::parse("package: name\nversion: 1.8.2\npackage: name2".as_bytes()).unwrap_err();
+            Control::parse(&b"package: name\nversion: 1.8.2\npackage: name2"[..]).unwrap_err();
         assert_matches!(err, Error::InvalidControlFile);
     }
 }

@@ -31,7 +31,7 @@ fn ar_with_out_debian_binary_fails_parse() {
     let reader = file.reopen().unwrap();
 
     let mut archive = ar::Builder::new(&file);
-    let header = ar::Header::new("debian-trinary".as_bytes().to_vec(), 4);
+    let header = ar::Header::new(b"debian-trinary".to_vec(), 4);
     archive.append(&header, "2.0\n".as_bytes()).unwrap();
     drop(file);
 
@@ -48,7 +48,7 @@ fn ar_with_wrong_debian_binary_content_fails_parse() {
     let reader = file.reopen().unwrap();
 
     let mut archive = ar::Builder::new(&file);
-    let header = ar::Header::new("debian-binary".as_bytes().to_vec(), 4);
+    let header = ar::Header::new(b"debian-binary".to_vec(), 4);
     archive.append(&header, "3.0\n".as_bytes()).unwrap();
     drop(file);
 
@@ -65,7 +65,7 @@ fn ar_with_only_debian_binary_fails_parse() {
     let reader = file.reopen().unwrap();
 
     let mut archive = ar::Builder::new(&file);
-    let header = ar::Header::new("debian-binary".as_bytes().to_vec(), 4);
+    let header = ar::Header::new(b"debian-binary".to_vec(), 4);
     archive.append(&header, "2.0\n".as_bytes()).unwrap();
     drop(file);
 
@@ -82,14 +82,14 @@ fn ar_with_empty_control_tar_fails_parse() {
     let reader = file.reopen().unwrap();
 
     let mut archive = ar::Builder::new(&file);
-    let header = ar::Header::new("debian-binary".as_bytes().to_vec(), 4);
+    let header = ar::Header::new(b"debian-binary".to_vec(), 4);
     archive.append(&header, "2.0\n".as_bytes()).unwrap();
 
     let control_tar = tar::Builder::new(std::vec::Vec::new());
     let control_tar = control_tar.into_inner().unwrap();
 
     let header = ar::Header::new(
-        "control.tar".as_bytes().to_vec(),
+        b"control.tar".to_vec(),
         u64::try_from(control_tar.len()).unwrap(),
     );
     archive.append(&header, &control_tar[..]).unwrap();
@@ -108,7 +108,7 @@ fn ar_with_empty_control_fails_parse() {
     let reader = file.reopen().unwrap();
 
     let mut archive = ar::Builder::new(&file);
-    let header = ar::Header::new("debian-binary".as_bytes().to_vec(), 4);
+    let header = ar::Header::new(b"debian-binary".to_vec(), 4);
     archive.append(&header, "2.0\n".as_bytes()).unwrap();
 
     let mut header = tar::Header::new_ustar();
@@ -120,13 +120,13 @@ fn ar_with_empty_control_fails_parse() {
         .append_data(
             &mut header,
             std::path::Path::new("control"),
-            "control".as_bytes(),
+            &b"control"[..],
         )
         .unwrap();
     let control_tar = control_tar.into_inner().unwrap();
 
     let header = ar::Header::new(
-        "control.tar".as_bytes().to_vec(),
+        b"control.tar".to_vec(),
         u64::try_from(control_tar.len()).unwrap(),
     );
     archive.append(&header, &control_tar[..]).unwrap();
