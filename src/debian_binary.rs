@@ -1,9 +1,8 @@
 use std::io::Read;
-use std::string::String;
+
+use arrayvec::ArrayString;
 
 use crate::{Error, Result};
-
-use regex::Regex;
 
 #[derive(Debug)]
 pub struct DebianBinaryVersion {
@@ -12,19 +11,34 @@ pub struct DebianBinaryVersion {
 }
 
 pub fn parse_debian_binary_contents<R: Read>(stream: &mut R) -> Result<DebianBinaryVersion> {
-    let mut buf: String = String::default();
+    let mut first_two_bytes: [u8; 2] = [0, 0];
+    stream.read_exact(&mut first_two_bytes)?;
 
-    let _ = stream.take(10).read_to_string(&mut buf)?;
-
-    let re = Regex::new(r"2\.(\d{1,3})\n").unwrap();
-
-    match re.captures(buf.as_str()) {
-        Some(captures) => Ok(DebianBinaryVersion {
-            major: 2,
-            minor: captures[1].parse::<u32>().unwrap(),
-        }),
-        None => Err(Error::InvalidVersion),
+    if &first_two_bytes != b"2." {
+        return Err(Error::InvalidVersion)
     }
+
+    // note: This limits the largest minor version to 99999. Hopefully we never get above that.
+    let mut string = ArrayString::<[_; 5]>::new();
+    for byte in stream.bytes() {
+        let byte = byte?;
+        if byte == b'\n' {
+            break;
+        }
+        if !(byte as char).is_digit(10) {
+            return Err(Error::InvalidVersion)
+        }
+        if string.is_full() {
+            return Err(Error::InvalidVersion)
+        }
+        string.push(byte as char);
+    }
+    let minor = match string.as_str().parse::<u32>() {
+        Ok(num) => num,
+        Err(_e) => return Err(Error::InvalidVersion)
+    };
+
+    Ok(DebianBinaryVersion{major: 2, minor})
 }
 
 #[cfg(test)]
@@ -50,11 +64,19 @@ mod tests {
     }
 
     #[test]
+    fn new_version_debian_binary_contents_fails() {
+        let contents = b"3.0\n";
+        let result = parse_debian_binary_contents(&mut contents.as_ref());
+        assert!(result.is_err());
+        assert_matches!(result.unwrap_err(), Error::InvalidVersion);
+    }
+
+    #[test]
     fn empty_debian_binary_contents_fails() {
         let contents = b"";
         let result = parse_debian_binary_contents(&mut contents.as_ref());
         assert!(result.is_err());
-        assert_matches!(result.unwrap_err(), Error::InvalidVersion);
+        assert_matches!(result.unwrap_err(), Error::Io(_));
     }
 
     #[test]
