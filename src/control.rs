@@ -15,7 +15,22 @@ struct Tag(String);
 
 // UncasedStrRef is used to be able to search a hash map of tags without
 // creating a new String.
+#[derive(Debug)]
 struct UncasedStrRef<'a>(&'a str);
+
+impl<'a> UncasedStrRef<'a> {
+    const fn new(s: &'a str) -> Self {
+        UncasedStrRef(s)
+    }
+}
+
+impl<'a> PartialEq for UncasedStrRef<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq_ignore_ascii_case(&other.0)
+    }
+}
+
+impl<'a> Eq for UncasedStrRef<'a> {}
 
 impl<'a> Hash for UncasedStrRef<'a> {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -27,7 +42,7 @@ impl<'a> Hash for UncasedStrRef<'a> {
 
 impl<'a> From<&'a str> for UncasedStrRef<'a> {
     fn from(s: &'a str) -> Self {
-        UncasedStrRef(s)
+        UncasedStrRef::new(s)
     }
 }
 
@@ -83,7 +98,18 @@ impl<'a> Equivalent<Tag> for UncasedStrRef<'a> {
     }
 }
 
-type Paragraph = IndexMap<Tag, Vec<String>>;
+#[derive(Debug)]
+enum FieldBody {
+    Simple(String),
+    Folded(String),
+    Multiline(String, Vec<String>)
+}
+
+type Paragraph = IndexMap<Tag, FieldBody>;
+
+const DESCRIPTION: UncasedStrRef = UncasedStrRef::new("Description");
+const PACKAGE: UncasedStrRef = UncasedStrRef::new("Package");
+const VERSION: UncasedStrRef = UncasedStrRef::new("Version");
 
 /// Stores the Debian package's control information
 #[derive(Debug)]
@@ -121,7 +147,17 @@ impl Control {
                         Some(ref name) => {
                             let continuation = line.trim();
                             let data = ctrl.paragraph.get_mut(name).unwrap();
-                            data.push(continuation.to_owned());
+                            match data {
+                                FieldBody::Simple(_value) => unreachable!(),
+                                FieldBody::Folded(value) => { 
+                                    value.push(' ');
+                                    value.push_str(continuation);
+                                },
+                                FieldBody::Multiline(_first, other) => {
+                                    other.push(continuation.to_owned());
+                                }
+
+                            };
                         }
                         None => return Err(Error::InvalidControlFile),
                     };
@@ -139,9 +175,12 @@ impl Control {
                         Some(ref field_name) => field_name.trim(),
                         None => return Err(Error::InvalidControlFile),
                     };
-                    let mut data = std::vec::Vec::default();
-                    data.push(field_value.to_owned());
                     let field_tag: Tag = field_name.into();
+                    let data = if field_tag == DESCRIPTION {
+                        FieldBody::Multiline(field_value.to_owned(), Vec::default())
+                    } else {
+                        FieldBody::Simple(field_value.to_owned())
+                    };
                     if let Some(_value) = ctrl.paragraph.insert(field_tag, data) {
                         return Err(Error::InvalidControlFile);
                     }
@@ -158,11 +197,11 @@ impl Control {
             }
         }
 
-        if !ctrl.paragraph.contains_key(&UncasedStrRef::from("package")) {
+        if !ctrl.paragraph.contains_key(&PACKAGE) {
             return Err(Error::MissingPackageName);
         }
 
-        if !ctrl.paragraph.contains_key(&UncasedStrRef::from("version")) {
+        if !ctrl.paragraph.contains_key(&VERSION) {
             return Err(Error::MissingPackageVersion);
         }
 
@@ -182,16 +221,20 @@ impl Control {
     }
 
     pub fn long_description(&self) -> Option<String> {
-        let desc = self.paragraph.get(&UncasedStrRef::from("Description"))?;
-        match desc.len() {
-            0 | 1 => None,
-            _ => Some(desc[1..].join("\n")),
+        let (_, long) = match self.paragraph.get(&DESCRIPTION)? {
+            FieldBody::Simple(_) | FieldBody::Folded(_) => unreachable!(),
+            FieldBody::Multiline(short, long) => (short, long)
+        };
+        match long.len() {
+            0 => None,
+            _ => Some(long.join("\n")),
         }
     }
 
     pub fn get(&self, field_name: &str) -> Option<&str> {
         match self.paragraph.get(&UncasedStrRef::from(field_name)) {
-            Some(lines) => Some(&lines[0]),
+            Some(FieldBody::Simple(value)) | Some(FieldBody::Folded(value)) => Some(value.as_str()),
+            Some(FieldBody::Multiline(value, _)) => Some(value.as_str()),
             None => None,
         }
     }
