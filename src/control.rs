@@ -106,7 +106,7 @@ enum FieldBody {
     #[allow(dead_code)]
     Folded(String),
 
-    Multiline(String, Vec<String>)
+    Multiline(String, Vec<String>),
 }
 
 type Paragraph = IndexMap<Tag, FieldBody>;
@@ -153,14 +153,13 @@ impl Control {
                             let data = ctrl.paragraph.get_mut(name).unwrap();
                             match data {
                                 FieldBody::Simple(_value) => unreachable!(),
-                                FieldBody::Folded(value) => { 
+                                FieldBody::Folded(value) => {
                                     value.push(' ');
                                     value.push_str(continuation);
-                                },
+                                }
                                 FieldBody::Multiline(_first, other) => {
                                     other.push(continuation.to_owned());
                                 }
-
                             };
                         }
                         None => return Err(Error::InvalidControlFile),
@@ -227,7 +226,7 @@ impl Control {
     pub fn long_description(&self) -> Option<String> {
         let (_, long) = match self.paragraph.get(&DESCRIPTION)? {
             FieldBody::Simple(_) | FieldBody::Folded(_) => unreachable!(),
-            FieldBody::Multiline(short, long) => (short, long)
+            FieldBody::Multiline(short, long) => (short, long),
         };
         match long.len() {
             0 => None,
