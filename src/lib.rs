@@ -177,7 +177,7 @@ impl<R: Read> DebPkg<R> {
     }
 
     /// Returns the long description (if it exists)
-    pub fn long_description(&self) -> Option<String> {
+    pub fn long_description(&self) -> Option<&str> {
         self.control.long_description()
     }
 }

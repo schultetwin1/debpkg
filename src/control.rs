@@ -1,7 +1,6 @@
 use std::hash::{Hash, Hasher};
 use std::io::{BufRead, BufReader, Read};
 use std::string::String;
-use std::vec::Vec;
 
 use crate::{Error, Result};
 
@@ -106,7 +105,7 @@ enum FieldBody {
     #[allow(dead_code)]
     Folded(String),
 
-    Multiline(String, Vec<String>),
+    Multiline(String, String),
 }
 
 type Paragraph = IndexMap<Tag, FieldBody>;
@@ -160,7 +159,10 @@ impl Control {
                                     value.push_str(continuation);
                                 }
                                 FieldBody::Multiline(_first, other) => {
-                                    other.push(continuation.to_owned());
+                                    if !other.is_empty() {
+                                        other.push('\n');
+                                    }
+                                    other.push_str(continuation);
                                 }
                             };
                         }
@@ -182,7 +184,7 @@ impl Control {
                     };
                     let field_tag: Tag = field_name.into();
                     let data = if field_tag == DESCRIPTION {
-                        FieldBody::Multiline(field_value.to_owned(), Vec::default())
+                        FieldBody::Multiline(field_value.to_owned(), String::default())
                     } else {
                         FieldBody::Simple(field_value.to_owned())
                     };
@@ -225,14 +227,14 @@ impl Control {
         self.get("Description")
     }
 
-    pub fn long_description(&self) -> Option<String> {
+    pub fn long_description(&self) -> Option<&str> {
         let (_, long) = match self.paragraph.get(&DESCRIPTION)? {
             FieldBody::Simple(_) | FieldBody::Folded(_) => unreachable!(),
             FieldBody::Multiline(short, long) => (short, long),
         };
         match long.len() {
             0 => None,
-            _ => Some(long.join("\n")),
+            _ => Some(long),
         }
     }
 
