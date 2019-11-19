@@ -152,7 +152,9 @@ impl Control {
                             let continuation = line.trim();
                             let data = ctrl.paragraph.get_mut(name).unwrap();
                             match data {
-                                FieldBody::Simple(_value) => unreachable!(),
+                                FieldBody::Simple(_value) => {
+                                    return Err(Error::InvalidControlFile)
+                                },
                                 FieldBody::Folded(value) => {
                                     value.push(' ');
                                     value.push_str(continuation);
@@ -320,6 +322,12 @@ mod tests {
     fn duplicate_fields_fails_parsing() {
         let err =
             Control::parse(&b"package: name\nversion: 1.8.2\npackage: name2"[..]).unwrap_err();
+        assert_matches!(err, Error::InvalidControlFile);
+    }
+
+    #[test]
+    fn continuation_in_package_should_fail() {
+        let err = Control::parse(&b"package: name\n is invalid\nversion: 1.8.2"[..]).unwrap_err();
         assert_matches!(err, Error::InvalidControlFile);
     }
 }
