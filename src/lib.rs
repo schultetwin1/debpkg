@@ -121,8 +121,12 @@ impl<R: Read> DebPkg<R> {
             Some(Err(err)) => return Err(Error::Io(err)),
             None => return Err(Error::MissingControlArchive),
         };
-        if !control_entry.header().identifier().starts_with(b"control.tar") {
-            return Err(Error::MissingControlArchive)
+        if !control_entry
+            .header()
+            .identifier()
+            .starts_with(b"control.tar")
+        {
+            return Err(Error::MissingControlArchive);
         }
         let control = extract_control_data(control_entry)?;
 
@@ -132,7 +136,7 @@ impl<R: Read> DebPkg<R> {
             None => return Err(Error::MissingDataArchive),
         };
         if !data_entry.header().identifier().starts_with(b"data.tar") {
-            return Err(Error::MissingDataArchive)
+            return Err(Error::MissingDataArchive);
         }
         drop(data_entry);
 
@@ -170,7 +174,9 @@ impl<R: Read> DebPkg<R> {
     }
 }
 
-fn get_tar_from_entry<'a, R: 'a + Read>(entry: ar::Entry<'a, R>) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
+fn get_tar_from_entry<'a, R: 'a + Read>(
+    entry: ar::Entry<'a, R>,
+) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
     let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
 
     if entry_ident.ends_with(".tar") {
