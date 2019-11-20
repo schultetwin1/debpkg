@@ -65,8 +65,8 @@ fn validate_debian_binary<'a, R: 'a + Read>(
     }
 }
 
-fn untar_control_data<R: Read>(tar_reader: R) -> Result<Control> {
-    let mut tar = tar::Archive::new(tar_reader);
+fn extract_control_data<'a, R: 'a + Read>(entry: ar::Entry<'a, R>) -> Result<Control> {
+    let mut tar = get_tar_from_entry(entry)?;
     let entries = tar.entries()?;
     let control_entry = entries
         .filter_map(|x| x.ok())
@@ -78,24 +78,6 @@ fn untar_control_data<R: Read>(tar_reader: R) -> Result<Control> {
     match control_entry {
         Some(control) => Control::parse(control),
         None => Err(Error::MissingControlFile),
-    }
-}
-
-fn extract_control_data<'a, R: 'a + Read>(entry: &mut ar::Entry<'a, R>) -> Result<Control> {
-    let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
-
-    match entry_ident {
-        "control.tar" => untar_control_data(entry),
-        "control.tar.gz" => {
-            let reader = flate2::read::GzDecoder::new(entry);
-            untar_control_data(reader)
-        }
-        "control.tar.xz" => {
-            let reader = xz2::read::XzDecoder::new_multi_decoder(entry);
-            untar_control_data(reader)
-        }
-        "control.tar.zst" => unimplemented!(),
-        _ => Err(Error::MissingControlArchive),
     }
 }
 
@@ -134,19 +116,25 @@ impl<R: Read> DebPkg<R> {
         validate_debian_binary(&mut debian_binary_entry)?;
         drop(debian_binary_entry);
 
-        let mut control_entry = match archive.next_entry() {
+        let control_entry = match archive.next_entry() {
             Some(Ok(entry)) => entry,
             Some(Err(err)) => return Err(Error::Io(err)),
             None => return Err(Error::MissingControlArchive),
         };
-        let control = extract_control_data(&mut control_entry)?;
-        drop(control_entry);
+        if !control_entry.header().identifier().starts_with(b"control.tar") {
+            return Err(Error::MissingControlArchive)
+        }
+        let control = extract_control_data(control_entry)?;
 
-        match archive.next_entry() {
-            Some(Ok(_entry)) => {}
+        let data_entry = match archive.next_entry() {
+            Some(Ok(entry)) => entry,
             Some(Err(err)) => return Err(Error::Io(err)),
             None => return Err(Error::MissingDataArchive),
         };
+        if !data_entry.header().identifier().starts_with(b"data.tar") {
+            return Err(Error::MissingDataArchive)
+        }
+        drop(data_entry);
 
         Ok(DebPkg { archive, control })
     }
@@ -182,6 +170,32 @@ impl<R: Read> DebPkg<R> {
     }
 }
 
+fn get_tar_from_entry<'a, R: 'a + Read>(entry: ar::Entry<'a, R>) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
+    let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
+
+    if entry_ident.ends_with(".tar") {
+        let entry: Box<dyn Read> = Box::new(entry);
+        Ok(tar::Archive::new(entry))
+    } else if entry_ident.ends_with(".tar.gz") {
+        let gz: Box<dyn Read> = Box::new(flate2::read::GzDecoder::new(entry));
+        Ok(tar::Archive::new(gz))
+    } else if entry_ident.ends_with(".tar.xz") {
+        let xz: Box<dyn Read> = Box::new(xz2::read::XzDecoder::new_multi_decoder(entry));
+        Ok(tar::Archive::new(xz))
+    } else if entry_ident.ends_with(".tar.lzma") {
+        // waiting to find a good lzma lib
+        unimplemented!();
+    } else if entry_ident.ends_with(".tar.bz2") {
+        let bz2: Box<dyn Read> = Box::new(bzip2::read::BzDecoder::new(entry));
+        Ok(tar::Archive::new(bz2))
+    } else if entry_ident.ends_with(".tar.zst") {
+        // waiting to find a good zstd lib
+        unimplemented!();
+    } else {
+        Err(Error::MissingDataArchive)
+    }
+}
+
 impl<R: Read + Seek> DebPkg<R> {
     /// Unpacks the filesystem in the debian package
     ///
@@ -202,29 +216,11 @@ impl<R: Read + Seek> DebPkg<R> {
     /// ```
     pub fn unpack<P: AsRef<std::path::Path>>(&mut self, dst: P) -> Result<()> {
         let entry = self.archive.jump_to_entry(2)?;
-        let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
 
-        match entry_ident {
-            "data.tar" => {
-                let mut tar = tar::Archive::new(entry);
-                tar.unpack(dst)?;
-                Ok(())
-            }
-            "data.tar.gz" => {
-                let gz = flate2::read::GzDecoder::new(entry);
-                let mut tar = tar::Archive::new(gz);
-                tar.unpack(dst)?;
-                Ok(())
-            }
-            "data.tar.xz" => {
-                let xz = xz2::read::XzDecoder::new_multi_decoder(entry);
-                let mut tar = tar::Archive::new(xz);
-                tar.unpack(dst)?;
-                Ok(())
-            }
-            "data.tar.zst" => unimplemented!(),
-            _ => Err(Error::MissingDataArchive),
-        }
+        let mut tar = get_tar_from_entry(entry)?;
+
+        tar.unpack(dst)?;
+        Ok(())
     }
 
     /// Lists the files in the debian package by extraction path
