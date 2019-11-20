@@ -248,25 +248,7 @@ impl<R: Read + Seek> DebPkg<R> {
     /// ```
     pub fn list_files(&mut self) -> Result<Vec<std::path::PathBuf>> {
         let entry = self.archive.jump_to_entry(2)?;
-        let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
-
-        match entry_ident {
-            "data.tar" => {
-                let mut tar = tar::Archive::new(entry);
-                list_files_in_tar(&mut tar)
-            }
-            "data.tar.gz" => {
-                let gz = flate2::read::GzDecoder::new(entry);
-                let mut tar = tar::Archive::new(gz);
-                list_files_in_tar(&mut tar)
-            }
-            "data.tar.xz" => {
-                let xz = xz2::read::XzDecoder::new_multi_decoder(entry);
-                let mut tar = tar::Archive::new(xz);
-                list_files_in_tar(&mut tar)
-            }
-            "data.tar.zst" => unimplemented!(),
-            _ => Err(Error::MissingDataArchive),
-        }
+        let mut tar = get_tar_from_entry(entry)?;
+        list_files_in_tar(&mut tar)
     }
 }
