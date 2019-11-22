@@ -202,7 +202,53 @@ fn get_tar_from_entry<'a, R: 'a + Read>(
     }
 }
 
-impl<R: Read + Seek> DebPkg<R> {
+impl<'a, R: 'a + Read + Seek> DebPkg<R> {
+    /// Returns the control tar
+    /// 
+    /// # Arguments
+    /// 
+    /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use debpkg::DebPkg;
+    /// let file = std::fs::File::open("test.deb").unwrap();
+    /// let mut pkg = DebPkg::parse(file).unwrap();
+    /// let mut control_tar = pkg.control().unwrap();
+    /// for file in control_tar.entries().unwrap() {
+    ///     println!("{}", file.unwrap().path().unwrap().display());
+    /// }
+    /// ```
+    /// 
+    pub fn control(&'a mut self) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
+        let entry = self.archive.jump_to_entry(1)?;
+        get_tar_from_entry(entry)
+    }
+
+    /// Returns the data tar
+    /// 
+    /// # Arguments
+    /// 
+    /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use debpkg::DebPkg;
+    /// let file = std::fs::File::open("test.deb").unwrap();
+    /// let mut pkg = DebPkg::parse(file).unwrap();
+    /// let mut data_tar = pkg.data().unwrap();
+    /// for file in data_tar.entries().unwrap() {
+    ///     println!("{}", file.unwrap().path().unwrap().display());
+    /// }
+    /// ```
+    /// 
+    pub fn data(&'a mut self) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
+        let entry = self.archive.jump_to_entry(2)?;
+        get_tar_from_entry(entry)
+    }
+
     /// Unpacks the filesystem in the debian package
     ///
     /// # Arguments
