@@ -149,6 +149,10 @@ fn xz_utils_parses() {
 
     let dir = tempfile::TempDir::new().unwrap();
     pkg.unpack(dir).unwrap();
+
+    let (major, minor) = pkg.format_version();
+    assert!(major == 2);
+    assert!(minor == 0);
 }
 
 #[test]
@@ -165,4 +169,8 @@ fn libgssglue_utils_parses() {
 
     let dir = tempfile::TempDir::new().unwrap();
     pkg.unpack(dir).unwrap();
+
+    let (major, minor) = pkg.format_version();
+    assert!(major == 2);
+    assert!(minor == 0);
 }

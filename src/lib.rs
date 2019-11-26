@@ -46,6 +46,9 @@ type Result<T> = std::result::Result<T, Error>;
 /// A debian package represented by the control data the archive holding all the
 /// information
 pub struct DebPkg<R: Read> {
+    /// The major and minor fomat version of the debian package
+    format_version: DebianBinaryVersion,
+
     /// The ar archive in which the debian package is contained
     archive: ar::Archive<R>,
 
@@ -113,7 +116,7 @@ impl<R: Read> DebPkg<R> {
             Some(Err(err)) => return Err(Error::Io(err)),
             None => return Err(Error::MissingDebianBinary),
         };
-        validate_debian_binary(&mut debian_binary_entry)?;
+        let format_version = validate_debian_binary(&mut debian_binary_entry)?;
         drop(debian_binary_entry);
 
         let control_entry = match archive.next_entry() {
@@ -140,7 +143,12 @@ impl<R: Read> DebPkg<R> {
         }
         drop(data_entry);
 
-        Ok(DebPkg { archive, control })
+        Ok(DebPkg { format_version, archive, control })
+    }
+
+    /// Returns the format version of the binary debian package
+    pub fn format_version(&self) -> (u32, u32) {
+        (self.format_version.major, self.format_version.minor)
     }
 
     /// Returns the package name
