@@ -129,13 +129,13 @@ impl Control {
     }
 
     /// Parse the Control file in a Debian Package out of a tar file
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `archive` - The archive which contains the tar file
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// use debpkg::{DebPkg, Control};
     /// let file = std::fs::File::open("test.deb").unwrap();
@@ -145,15 +145,13 @@ impl Control {
     /// ```
     pub fn extract<R: Read>(mut archive: tar::Archive<R>) -> Result<Control> {
         let mut entries = archive.entries()?;
-        
-        let file = entries.find(|x| {
-            match x {
-                Ok(file) => match file.path() {
-                    Ok(path) => path == std::path::Path::new("./control"),
-                    Err(_e) => false,
-                },
-                Err(_e) => false
-            }
+
+        let file = entries.find(|x| match x {
+            Ok(file) => match file.path() {
+                Ok(path) => path == std::path::Path::new("./control"),
+                Err(_e) => false,
+            },
+            Err(_e) => false,
         });
 
         match file {
@@ -164,14 +162,14 @@ impl Control {
     }
 
     /// Parse the Control file in a Debian Package
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `reader` - A types which implements read as contains Debian binary
     ///              package control file
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// use debpkg::{DebPkg, Control};
     /// let file = std::fs::File::open("test.deb").unwrap();
@@ -193,7 +191,7 @@ impl Control {
                 Some('#') => {
                     // Comment line, ignore
                     continue;
-                },
+                }
 
                 Some(' ') | Some('\t') => {
                     // contiuation of the current field
@@ -217,7 +215,7 @@ impl Control {
                         }
                         None => return Err(Error::InvalidControlFile),
                     };
-                },
+                }
 
                 Some(_) => {
                     // new field
@@ -242,14 +240,14 @@ impl Control {
                     }
                     let field_tag: Tag = field_name.into();
                     curr_name = Some(field_tag);
-                },
+                }
 
                 None => {
                     // Paragraph seperation
                     // TODO: This is technically an error but ignoring for now
                     warn!("Unexpected paragraph seperation");
                     continue;
-                },
+                }
             }
         }
 
@@ -292,11 +290,11 @@ impl Control {
     }
 
     /// Returns field value based on field name if it exists
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * self - A Control struct returned from Control::parse
-    /// 
+    ///
     /// * field_name - The field name. This string is case insensitve
     pub fn get(&self, field_name: &str) -> Option<&str> {
         match self.paragraph.get(&UncasedStrRef::from(field_name)) {

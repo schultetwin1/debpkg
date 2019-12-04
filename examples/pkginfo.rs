@@ -46,7 +46,10 @@ fn main() {
     let control_tar = match pkg.control() {
         Ok(tar) => tar,
         Err(e) => {
-            println!("ERROR: Failed to get control tar from debian file \"{}\"", deb_path.display());
+            println!(
+                "ERROR: Failed to get control tar from debian file \"{}\"",
+                deb_path.display()
+            );
             println!("       {}", e);
             process::exit(1);
         }
@@ -55,7 +58,10 @@ fn main() {
     let control = match debpkg::Control::extract(control_tar) {
         Ok(control) => control,
         Err(e) => {
-            println!("ERROR: Failed to parse debian control file \"{}\"", deb_path.display());
+            println!(
+                "ERROR: Failed to parse debian control file \"{}\"",
+                deb_path.display()
+            );
             println!("       {}", e);
             process::exit(1);
         }

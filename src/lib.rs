@@ -113,7 +113,11 @@ impl<'a, R: 'a + Read> DebPkg<R> {
         let format_version = validate_debian_binary(&mut debian_binary_entry)?;
         drop(debian_binary_entry);
 
-        Ok(DebPkg { state: ReadState::Opened, format_version, archive })
+        Ok(DebPkg {
+            state: ReadState::Opened,
+            format_version,
+            archive,
+        })
     }
 
     /// Returns the format version of the binary debian package
@@ -122,13 +126,13 @@ impl<'a, R: 'a + Read> DebPkg<R> {
     }
 
     /// Returns the control tar
-    /// 
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// use debpkg::DebPkg;
     /// let file = std::fs::File::open("test.deb").unwrap();
@@ -138,32 +142,32 @@ impl<'a, R: 'a + Read> DebPkg<R> {
     ///     println!("{}", file.unwrap().path().unwrap().display());
     /// }
     /// ```
-    /// 
+    ///
     pub fn control(&'a mut self) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
         match self.state {
             ReadState::Opened => {
                 let entry = match self.archive.next_entry() {
                     Some(entry) => entry?,
-                    None => return Err(Error::MissingControlArchive)
+                    None => return Err(Error::MissingControlArchive),
                 };
 
                 self.state = ReadState::ControlRead;
                 get_tar_from_entry(entry)
-            },
+            }
             ReadState::ControlRead | ReadState::DataRead => Err(Error::ControlAlreadyRead),
         }
     }
 
     /// Returns the data tar
-    /// 
-    /// Must only be called 
-    /// 
+    ///
+    /// Must only be called
+    ///
     /// # Arguments
-    /// 
+    ///
     /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```no_run
     /// use debpkg::DebPkg;
     /// let file = std::fs::File::open("test.deb").unwrap();
@@ -173,7 +177,7 @@ impl<'a, R: 'a + Read> DebPkg<R> {
     ///     println!("{}", file.unwrap().path().unwrap().display());
     /// }
     /// ```
-    /// 
+    ///
     pub fn data(&'a mut self) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
         match self.control() {
             Ok(_) => (),
@@ -186,13 +190,12 @@ impl<'a, R: 'a + Read> DebPkg<R> {
             ReadState::ControlRead => {
                 let entry = match self.archive.next_entry() {
                     Some(entry) => entry?,
-                    None => return Err(Error::MissingDataArchive)
+                    None => return Err(Error::MissingDataArchive),
                 };
 
                 self.state = ReadState::DataRead;
                 get_tar_from_entry(entry)
-
-            },
+            }
             ReadState::DataRead => Err(Error::DataAlreadyRead),
         }
     }
