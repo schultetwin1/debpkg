@@ -28,11 +28,13 @@
 //! println!("Package Version: {}", control.version());
 //! let arch = control.get("Architecture").unwrap();
 //! println!("Package Architecture: {}", arch);
+//!
+//! let mut data = pkg.data().unwrap();
 //! let dir = tempfile::TempDir::new().unwrap();
-//! pkg.unpack(dir).unwrap();
+//! data.unpack(dir).unwrap();
 //! ```
 
-use std::io::{Read, Seek};
+use std::io::Read;
 
 mod error;
 pub use error::Error;
@@ -76,16 +78,6 @@ fn validate_debian_binary<'a, R: 'a + Read>(
     } else {
         Err(Error::MissingDebianBinary)
     }
-}
-
-fn list_files_in_tar<'a, R: 'a + Read>(
-    tar: &mut tar::Archive<R>,
-) -> Result<Vec<std::path::PathBuf>> {
-    let entries = tar.entries()?;
-    let paths: Vec<std::path::PathBuf> = entries
-        .map(|e| e.unwrap().path().unwrap().into_owned())
-        .collect();
-    Ok(paths)
 }
 
 impl<'a, R: 'a + Read> DebPkg<R> {
@@ -226,56 +218,5 @@ fn get_tar_from_entry<'a, R: 'a + Read>(
         unimplemented!();
     } else {
         Err(Error::MissingDataArchive)
-    }
-}
-
-impl<'a, R: 'a + Read + Seek> DebPkg<R> {
-    /// Unpacks the filesystem in the debian package
-    ///
-    /// # Arguments
-    ///
-    /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
-    ///
-    /// * `dst` - The path to extract all the files to
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use debpkg::DebPkg;
-    /// let file = std::fs::File::open("test.deb").unwrap();
-    /// let dir = tempfile::TempDir::new().unwrap();
-    /// let mut pkg = DebPkg::parse(file).unwrap();
-    /// pkg.unpack(dir).unwrap();
-    /// ```
-    pub fn unpack<P: AsRef<std::path::Path>>(&mut self, dst: P) -> Result<()> {
-        let entry = self.archive.jump_to_entry(2)?;
-
-        let mut tar = get_tar_from_entry(entry)?;
-
-        tar.unpack(dst)?;
-        Ok(())
-    }
-
-    /// Lists the files in the debian package by extraction path
-    ///
-    /// # Arguments
-    ///
-    /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
-    ///
-    /// # Example
-    ///
-    /// ```no_run
-    /// use debpkg::DebPkg;
-    /// let file = std::fs::File::open("test.deb").unwrap();
-    /// let mut pkg = DebPkg::parse(file).unwrap();
-    /// let paths = pkg.list_files().unwrap();
-    /// for path in paths {
-    ///     println!("{}", path.display());
-    /// }
-    /// ```
-    pub fn list_files(&mut self) -> Result<Vec<std::path::PathBuf>> {
-        let entry = self.archive.jump_to_entry(2)?;
-        let mut tar = get_tar_from_entry(entry)?;
-        list_files_in_tar(&mut tar)
     }
 }

@@ -43,7 +43,11 @@ fn main() {
         }
     };
 
-    let files = pkg.list_files().unwrap();
+    let mut data = pkg.data().unwrap();
+    let entries = data.entries().unwrap();
+    let files: Vec<std::path::PathBuf> = entries
+        .map(|e| e.unwrap().path().unwrap().into_owned())
+        .collect();
 
     for file in files {
         println!("{}", file.display());

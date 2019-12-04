@@ -154,8 +154,11 @@ fn xz_utils_parses() {
     let control = debpkg::Control::extract(control_tar).unwrap();
     assert!(control.name() == "xz-utils");
 
+    let mut data = pkg.data().unwrap();
+
     let dir = tempfile::TempDir::new().unwrap();
-    pkg.unpack(dir).unwrap();
+    data.unpack(dir).unwrap();
+    drop(data);
 
     let (major, minor) = pkg.format_version();
     assert!(major == 2);
@@ -176,8 +179,11 @@ fn libgssglue_utils_parses() {
     assert!(control.get("ARCHitecture").unwrap() == "amd64");
     assert!(control.get("BLAH").is_none());
 
+    let mut data = pkg.data().unwrap();
+
     let dir = tempfile::TempDir::new().unwrap();
-    pkg.unpack(dir).unwrap();
+    data.unpack(dir).unwrap();
+    drop(data);
 
     let (major, minor) = pkg.format_version();
     assert!(major == 2);
