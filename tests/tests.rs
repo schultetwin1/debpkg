@@ -60,7 +60,7 @@ fn ar_with_wrong_debian_binary_content_fails_parse() {
 }
 
 #[test]
-fn ar_with_only_debian_binary_fails_parse() {
+fn ar_with_only_debian_binary_fails_control() {
     let file = NamedTempFile::new().unwrap();
     let reader = file.reopen().unwrap();
 
@@ -69,15 +69,16 @@ fn ar_with_only_debian_binary_fails_parse() {
     archive.append(&header, "2.0\n".as_bytes()).unwrap();
     drop(file);
 
-    let pkg_result = debpkg::DebPkg::parse(&reader);
+    let mut pkg = debpkg::DebPkg::parse(&reader).unwrap();
+    let control_result = pkg.control();
     assert!(
-        pkg_result.is_err(),
+        control_result.is_err(),
         "Should fail to parse ar with only debian binary"
     );
 }
 
 #[test]
-fn ar_with_empty_control_tar_fails_parse() {
+fn ar_with_empty_control_tar_fails_control_extract() {
     let file = NamedTempFile::new().unwrap();
     let reader = file.reopen().unwrap();
 
@@ -95,15 +96,17 @@ fn ar_with_empty_control_tar_fails_parse() {
     archive.append(&header, &control_tar[..]).unwrap();
     drop(file);
 
-    let pkg_result = debpkg::DebPkg::parse(&reader);
+    let mut pkg = debpkg::DebPkg::parse(&reader).unwrap();
+    let control = pkg.control().unwrap();
+    let control_result = debpkg::Control::extract(control);
     assert!(
-        pkg_result.is_err(),
+        control_result.is_err(),
         "Should fail to parse ar with only debian binary"
     );
 }
 
 #[test]
-fn ar_with_empty_control_fails_parse() {
+fn ar_with_empty_control_fails_extract() {
     let file = NamedTempFile::new().unwrap();
     let reader = file.reopen().unwrap();
 
@@ -132,9 +135,11 @@ fn ar_with_empty_control_fails_parse() {
     archive.append(&header, &control_tar[..]).unwrap();
     drop(file);
 
-    let pkg_result = debpkg::DebPkg::parse(&reader);
+    let mut pkg = debpkg::DebPkg::parse(&reader).unwrap();
+    let control = pkg.control().unwrap();
+    let control_result = debpkg::Control::extract(control);
     assert!(
-        pkg_result.is_err(),
+        control_result.is_err(),
         "Should fail to parse ar with only debian binary"
     );
 }
@@ -145,7 +150,9 @@ fn xz_utils_parses() {
     let xz_deb = std::fs::File::open(xz_deb_path).unwrap();
 
     let mut pkg = debpkg::DebPkg::parse(xz_deb).unwrap();
-    assert!(pkg.name() == "xz-utils");
+    let control_tar = pkg.control().unwrap();
+    let control = debpkg::Control::extract(control_tar).unwrap();
+    assert!(control.name() == "xz-utils");
 
     let dir = tempfile::TempDir::new().unwrap();
     pkg.unpack(dir).unwrap();
@@ -161,11 +168,13 @@ fn libgssglue_utils_parses() {
     let libgssglue_deb = std::fs::File::open(libgssglue_deb_path).unwrap();
 
     let mut pkg = debpkg::DebPkg::parse(libgssglue_deb).unwrap();
-    assert!(pkg.name() == "libgssglue1");
-    assert!(pkg.version() == "0.3-4");
-    assert!(pkg.get("Architecture").unwrap() == "amd64");
-    assert!(pkg.get("ARCHitecture").unwrap() == "amd64");
-    assert!(pkg.get("BLAH").is_none());
+    let control_tar = pkg.control().unwrap();
+    let control = debpkg::Control::extract(control_tar).unwrap();
+    assert!(control.name() == "libgssglue1");
+    assert!(control.version() == "0.3-4");
+    assert!(control.get("Architecture").unwrap() == "amd64");
+    assert!(control.get("ARCHitecture").unwrap() == "amd64");
+    assert!(control.get("BLAH").is_none());
 
     let dir = tempfile::TempDir::new().unwrap();
     pkg.unpack(dir).unwrap();

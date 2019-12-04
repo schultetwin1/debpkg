@@ -22,9 +22,11 @@
 //! ```no_run
 //! let file = std::fs::File::open("test.deb").unwrap();
 //! let mut pkg = debpkg::DebPkg::parse(file).unwrap();
-//! println!("Package Name: {}", pkg.name());
-//! println!("Package Version: {}", pkg.version());
-//! let arch = pkg.get("Architecture").unwrap();
+//! let mut control_tar = pkg.control().unwrap();
+//! let control = debpkg::Control::extract(control_tar).unwrap();
+//! println!("Package Name: {}", control.name());
+//! println!("Package Version: {}", control.version());
+//! let arch = control.get("Architecture").unwrap();
 //! println!("Package Architecture: {}", arch);
 //! let dir = tempfile::TempDir::new().unwrap();
 //! pkg.unpack(dir).unwrap();
@@ -36,24 +38,32 @@ mod error;
 pub use error::Error;
 
 mod control;
-use control::Control;
+pub use control::Control;
 
 mod debian_binary;
 use debian_binary::{parse_debian_binary_contents, DebianBinaryVersion};
 
 type Result<T> = std::result::Result<T, Error>;
 
+enum ReadState {
+    Opened,
+    ControlRead,
+    DataRead,
+}
+
 /// A debian package represented by the control data the archive holding all the
 /// information
 pub struct DebPkg<R: Read> {
+    /// How far we've read through the debian package. This is especially
+    /// important when R only implements Read and not Seek since we will not be
+    /// able to Read backwards.
+    state: ReadState,
+
     /// The major and minor fomat version of the debian package
     format_version: DebianBinaryVersion,
 
     /// The ar archive in which the debian package is contained
     archive: ar::Archive<R>,
-
-    /// The deb-control information about the debian package
-    control: Control,
 }
 
 fn validate_debian_binary<'a, R: 'a + Read>(
@@ -68,22 +78,6 @@ fn validate_debian_binary<'a, R: 'a + Read>(
     }
 }
 
-fn extract_control_data<'a, R: 'a + Read>(entry: ar::Entry<'a, R>) -> Result<Control> {
-    let mut tar = get_tar_from_entry(entry)?;
-    let entries = tar.entries()?;
-    let control_entry = entries
-        .filter_map(|x| x.ok())
-        .filter(|entry| entry.path().is_ok())
-        .find(|entry| {
-            let path = entry.path().unwrap();
-            path == std::path::Path::new("./control")
-        });
-    match control_entry {
-        Some(control) => Control::parse(control),
-        None => Err(Error::MissingControlFile),
-    }
-}
-
 fn list_files_in_tar<'a, R: 'a + Read>(
     tar: &mut tar::Archive<R>,
 ) -> Result<Vec<std::path::PathBuf>> {
@@ -94,7 +88,7 @@ fn list_files_in_tar<'a, R: 'a + Read>(
     Ok(paths)
 }
 
-impl<R: Read> DebPkg<R> {
+impl<'a, R: 'a + Read> DebPkg<R> {
     /// Parses a debian package out of reader
     ///
     /// # Arguments
@@ -119,31 +113,7 @@ impl<R: Read> DebPkg<R> {
         let format_version = validate_debian_binary(&mut debian_binary_entry)?;
         drop(debian_binary_entry);
 
-        let control_entry = match archive.next_entry() {
-            Some(Ok(entry)) => entry,
-            Some(Err(err)) => return Err(Error::Io(err)),
-            None => return Err(Error::MissingControlArchive),
-        };
-        if !control_entry
-            .header()
-            .identifier()
-            .starts_with(b"control.tar")
-        {
-            return Err(Error::MissingControlArchive);
-        }
-        let control = extract_control_data(control_entry)?;
-
-        let data_entry = match archive.next_entry() {
-            Some(Ok(entry)) => entry,
-            Some(Err(err)) => return Err(Error::Io(err)),
-            None => return Err(Error::MissingDataArchive),
-        };
-        if !data_entry.header().identifier().starts_with(b"data.tar") {
-            return Err(Error::MissingDataArchive);
-        }
-        drop(data_entry);
-
-        Ok(DebPkg { format_version, archive, control })
+        Ok(DebPkg { state: ReadState::Opened, format_version, archive })
     }
 
     /// Returns the format version of the binary debian package
@@ -151,34 +121,80 @@ impl<R: Read> DebPkg<R> {
         (self.format_version.major, self.format_version.minor)
     }
 
-    /// Returns the package name
-    pub fn name(&self) -> &str {
-        self.control.name()
+    /// Returns the control tar
+    /// 
+    /// # Arguments
+    /// 
+    /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use debpkg::DebPkg;
+    /// let file = std::fs::File::open("test.deb").unwrap();
+    /// let mut pkg = DebPkg::parse(file).unwrap();
+    /// let mut control_tar = pkg.control().unwrap();
+    /// for file in control_tar.entries().unwrap() {
+    ///     println!("{}", file.unwrap().path().unwrap().display());
+    /// }
+    /// ```
+    /// 
+    pub fn control(&'a mut self) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
+        match self.state {
+            ReadState::Opened => {
+                let entry = match self.archive.next_entry() {
+                    Some(entry) => entry?,
+                    None => return Err(Error::MissingControlArchive)
+                };
+
+                self.state = ReadState::ControlRead;
+                get_tar_from_entry(entry)
+            },
+            ReadState::ControlRead | ReadState::DataRead => Err(Error::ControlAlreadyRead),
+        }
     }
 
-    /// Returns the package version
-    pub fn version(&self) -> &str {
-        self.control.version()
-    }
+    /// Returns the data tar
+    /// 
+    /// Must only be called 
+    /// 
+    /// # Arguments
+    /// 
+    /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use debpkg::DebPkg;
+    /// let file = std::fs::File::open("test.deb").unwrap();
+    /// let mut pkg = DebPkg::parse(file).unwrap();
+    /// let mut data_tar = pkg.data().unwrap();
+    /// for file in data_tar.entries().unwrap() {
+    ///     println!("{}", file.unwrap().path().unwrap().display());
+    /// }
+    /// ```
+    /// 
+    pub fn data(&'a mut self) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
+        match self.control() {
+            Ok(_) => (),
+            Err(Error::ControlAlreadyRead) => (),
+            Err(e) => return Err(e),
+        };
 
-    /// Returns a specific tag in the control file if it exists
-    pub fn get(&self, key: &str) -> Option<&str> {
-        self.control.get(key)
-    }
+        match self.state {
+            ReadState::Opened => unreachable!(),
+            ReadState::ControlRead => {
+                let entry = match self.archive.next_entry() {
+                    Some(entry) => entry?,
+                    None => return Err(Error::MissingDataArchive)
+                };
 
-    /// Returns an iterator of all the tags in the control file
-    pub fn control_tags(&self) -> impl Iterator<Item = &str> {
-        self.control.tags()
-    }
+                self.state = ReadState::DataRead;
+                get_tar_from_entry(entry)
 
-    /// Returns the short description (if it exists)
-    pub fn short_description(&self) -> Option<&str> {
-        self.control.short_description()
-    }
-
-    /// Returns the long description (if it exists)
-    pub fn long_description(&self) -> Option<&str> {
-        self.control.long_description()
+            },
+            ReadState::DataRead => Err(Error::DataAlreadyRead),
+        }
     }
 }
 
@@ -211,52 +227,6 @@ fn get_tar_from_entry<'a, R: 'a + Read>(
 }
 
 impl<'a, R: 'a + Read + Seek> DebPkg<R> {
-    /// Returns the control tar
-    /// 
-    /// # Arguments
-    /// 
-    /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
-    /// 
-    /// # Example
-    /// 
-    /// ```no_run
-    /// use debpkg::DebPkg;
-    /// let file = std::fs::File::open("test.deb").unwrap();
-    /// let mut pkg = DebPkg::parse(file).unwrap();
-    /// let mut control_tar = pkg.control().unwrap();
-    /// for file in control_tar.entries().unwrap() {
-    ///     println!("{}", file.unwrap().path().unwrap().display());
-    /// }
-    /// ```
-    /// 
-    pub fn control(&'a mut self) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
-        let entry = self.archive.jump_to_entry(1)?;
-        get_tar_from_entry(entry)
-    }
-
-    /// Returns the data tar
-    /// 
-    /// # Arguments
-    /// 
-    /// * `self` - A `DebPkg` created by a call to `DebPkg::parse`
-    /// 
-    /// # Example
-    /// 
-    /// ```no_run
-    /// use debpkg::DebPkg;
-    /// let file = std::fs::File::open("test.deb").unwrap();
-    /// let mut pkg = DebPkg::parse(file).unwrap();
-    /// let mut data_tar = pkg.data().unwrap();
-    /// for file in data_tar.entries().unwrap() {
-    ///     println!("{}", file.unwrap().path().unwrap().display());
-    /// }
-    /// ```
-    /// 
-    pub fn data(&'a mut self) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
-        let entry = self.archive.jump_to_entry(2)?;
-        get_tar_from_entry(entry)
-    }
-
     /// Unpacks the filesystem in the debian package
     ///
     /// # Arguments

@@ -29,6 +29,12 @@ pub enum Error {
     /// The ar archive does not contain a data archive
     MissingDataArchive,
 
+    /// The control archive was already read and thus can not be read again
+    ControlAlreadyRead,
+
+    /// The data archive was already read and thus can not be read again
+    DataAlreadyRead,
+
     /// These was an IoError during the parsing
     Io(IoError),
 }
@@ -53,6 +59,8 @@ impl StdError for Error {
             Error::InvalidControlFile => "control file missed formatted",
             Error::MissingControlArchive => "control archive is missing",
             Error::MissingDataArchive => "data archive is missing",
+            Error::ControlAlreadyRead => "control archive has been past",
+            Error::DataAlreadyRead => "data archive has been past",
             Error::Io(_err) => "IO Error",
         }
     }

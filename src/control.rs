@@ -117,6 +117,7 @@ const VERSION: UncasedStrRef = UncasedStrRef::new("Version");
 /// Stores the Debian package's control information
 #[derive(Debug)]
 pub struct Control {
+    /// Contains a map of a case insensative string to a field body
     paragraph: Paragraph,
 }
 
@@ -127,6 +128,56 @@ impl Control {
         }
     }
 
+    /// Parse the Control file in a Debian Package out of a tar file
+    /// 
+    /// # Arguments
+    /// 
+    /// * `archive` - The archive which contains the tar file
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use debpkg::{DebPkg, Control};
+    /// let file = std::fs::File::open("test.deb").unwrap();
+    /// let mut pkg = DebPkg::parse(file).unwrap();
+    /// let mut control_tar = pkg.control().unwrap();
+    /// let control = Control::extract(control_tar).unwrap();
+    /// ```
+    pub fn extract<R: Read>(mut archive: tar::Archive<R>) -> Result<Control> {
+        let mut entries = archive.entries()?;
+        
+        let file = entries.find(|x| {
+            match x {
+                Ok(file) => match file.path() {
+                    Ok(path) => path == std::path::Path::new("./control"),
+                    Err(_e) => false,
+                },
+                Err(_e) => false
+            }
+        });
+
+        match file {
+            Some(Ok(file)) => Self::parse(file),
+            Some(Err(e)) => Err(Error::Io(e)),
+            None => Err(Error::MissingControlFile),
+        }
+    }
+
+    /// Parse the Control file in a Debian Package
+    /// 
+    /// # Arguments
+    /// 
+    /// * `reader` - A types which implements read as contains Debian binary
+    ///              package control file
+    /// 
+    /// # Example
+    /// 
+    /// ```no_run
+    /// use debpkg::{DebPkg, Control};
+    /// let file = std::fs::File::open("test.deb").unwrap();
+    /// let mut pkg = DebPkg::parse(file).unwrap();
+    /// let control_tar = pkg.control().unwrap();
+    /// ```
     pub fn parse<R: Read>(reader: R) -> Result<Control> {
         let buf_reader = BufReader::new(reader);
         let lines = buf_reader.lines();
@@ -142,7 +193,7 @@ impl Control {
                 Some('#') => {
                     // Comment line, ignore
                     continue;
-                }
+                },
 
                 Some(' ') | Some('\t') => {
                     // contiuation of the current field
@@ -166,7 +217,7 @@ impl Control {
                         }
                         None => return Err(Error::InvalidControlFile),
                     };
-                }
+                },
 
                 Some(_) => {
                     // new field
@@ -191,14 +242,14 @@ impl Control {
                     }
                     let field_tag: Tag = field_name.into();
                     curr_name = Some(field_tag);
-                }
+                },
 
                 None => {
                     // Paragraph seperation
                     // TODO: This is technically an error but ignoring for now
                     warn!("Unexpected paragraph seperation");
                     continue;
-                }
+                },
             }
         }
 
@@ -213,18 +264,22 @@ impl Control {
         Ok(ctrl)
     }
 
+    /// Returns the package name from the control file
     pub fn name(&self) -> &str {
         self.get("Package").unwrap()
     }
 
+    /// Returns the package version from the control file
     pub fn version(&self) -> &str {
         self.get("Version").unwrap()
     }
 
+    /// Returns short description if it exists from the control file
     pub fn short_description(&self) -> Option<&str> {
         self.get("Description")
     }
 
+    /// Returns long description if it exists from the control file
     pub fn long_description(&self) -> Option<&str> {
         let (_, long) = match self.paragraph.get(&DESCRIPTION)? {
             FieldBody::Simple(_) | FieldBody::Folded(_) => unreachable!(),
@@ -236,6 +291,13 @@ impl Control {
         }
     }
 
+    /// Returns field value based on field name if it exists
+    /// 
+    /// # Arguments
+    /// 
+    /// * self - A Control struct returned from Control::parse
+    /// 
+    /// * field_name - The field name. This string is case insensitve
     pub fn get(&self, field_name: &str) -> Option<&str> {
         match self.paragraph.get(&UncasedStrRef::from(field_name)) {
             Some(FieldBody::Simple(value)) | Some(FieldBody::Folded(value)) => Some(value.as_str()),
@@ -244,6 +306,7 @@ impl Control {
         }
     }
 
+    /// Returns an iterator to all the field names in the control file
     pub fn tags(&self) -> impl Iterator<Item = &str> {
         self.paragraph.keys().map(|i| i.as_ref())
     }
