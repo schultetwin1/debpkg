@@ -4,6 +4,8 @@ use tempfile::NamedTempFile;
 use std::convert::TryFrom;
 use std::env;
 
+use assert_matches::assert_matches;
+
 fn get_deb_path(filename: &str) -> std::path::PathBuf {
     let root_dir = &env::var("CARGO_MANIFEST_DIR").unwrap();
     let mut source_path = std::path::PathBuf::from(root_dir);
@@ -21,8 +23,8 @@ fn empty_ar_fails_parse() {
     let _ = ar::Builder::new(&file);
     drop(file);
 
-    let pkg_result = debpkg::DebPkg::parse(&reader);
-    assert!(pkg_result.is_err(), "Should fail to parse empty ar");
+    let pkg_result = debpkg::DebPkg::parse(&reader).err().unwrap();
+    assert_matches!(pkg_result, debpkg::Error::Io(_));
 }
 
 #[test]
@@ -35,10 +37,10 @@ fn ar_with_out_debian_binary_fails_parse() {
     archive.append(&header, "2.0\n".as_bytes()).unwrap();
     drop(file);
 
-    let pkg_result = debpkg::DebPkg::parse(&reader);
-    assert!(
-        pkg_result.is_err(),
-        "Should fail to parse ar without debian-binary file"
+    let pkg_result = debpkg::DebPkg::parse(&reader).err().unwrap();
+    assert_matches!(
+        pkg_result,
+        debpkg::Error::MissingDebianBinary
     );
 }
 
@@ -52,10 +54,10 @@ fn ar_with_wrong_debian_binary_content_fails_parse() {
     archive.append(&header, "3.0\n".as_bytes()).unwrap();
     drop(file);
 
-    let pkg_result = debpkg::DebPkg::parse(&reader);
-    assert!(
-        pkg_result.is_err(),
-        "Should fail to parse ar with debian-binary file with the wrong version"
+    let pkg_result = debpkg::DebPkg::parse(&reader).err().unwrap();
+    assert_matches!(
+        pkg_result,
+        debpkg::Error::InvalidVersion
     );
 }
 
@@ -70,10 +72,10 @@ fn ar_with_only_debian_binary_fails_control() {
     drop(file);
 
     let mut pkg = debpkg::DebPkg::parse(&reader).unwrap();
-    let control_result = pkg.control();
-    assert!(
-        control_result.is_err(),
-        "Should fail to parse ar with only debian binary"
+    let control_result = pkg.control().err().unwrap();
+    assert_matches!(
+        control_result,
+        debpkg::Error::MissingControlArchive
     );
 }
 
@@ -97,11 +99,11 @@ fn ar_with_empty_control_tar_fails_control_extract() {
     drop(file);
 
     let mut pkg = debpkg::DebPkg::parse(&reader).unwrap();
-    let control = pkg.control().unwrap();
-    let control_result = debpkg::Control::extract(control);
-    assert!(
-        control_result.is_err(),
-        "Should fail to parse ar with only debian binary"
+    let control_tar = pkg.control().unwrap();
+    let control_result = debpkg::Control::extract(control_tar).err().unwrap();
+    assert_matches!(
+        control_result,
+        debpkg::Error::MissingControlFile
     );
 }
 
@@ -114,18 +116,21 @@ fn ar_with_empty_control_fails_extract() {
     let header = ar::Header::new(b"debian-binary".to_vec(), 4);
     archive.append(&header, "2.0\n".as_bytes()).unwrap();
 
+    let control_file_contents = b"control";
+
     let mut header = tar::Header::new_ustar();
-    header.set_size(u64::try_from("control".len()).unwrap());
+    header.set_size(u64::try_from(control_file_contents.len()).unwrap());
     header.set_cksum();
 
     let mut control_tar = tar::Builder::new(std::vec::Vec::new());
     control_tar
         .append_data(
             &mut header,
-            std::path::Path::new("control"),
-            &b"control"[..],
+            std::path::Path::new("./control"),
+            &control_file_contents[..],
         )
         .unwrap();
+
     let control_tar = control_tar.into_inner().unwrap();
 
     let header = ar::Header::new(
@@ -136,11 +141,11 @@ fn ar_with_empty_control_fails_extract() {
     drop(file);
 
     let mut pkg = debpkg::DebPkg::parse(&reader).unwrap();
-    let control = pkg.control().unwrap();
-    let control_result = debpkg::Control::extract(control);
-    assert!(
-        control_result.is_err(),
-        "Should fail to parse ar with only debian binary"
+    let control_tar = pkg.control().unwrap();
+    let control_result = debpkg::Control::extract(control_tar).err().unwrap();
+    assert_matches!(
+        control_result,
+        debpkg::Error::InvalidControlFile
     );
 }
 
