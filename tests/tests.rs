@@ -38,10 +38,7 @@ fn ar_with_out_debian_binary_fails_parse() {
     drop(file);
 
     let pkg_result = debpkg::DebPkg::parse(&reader).err().unwrap();
-    assert_matches!(
-        pkg_result,
-        debpkg::Error::MissingDebianBinary
-    );
+    assert_matches!(pkg_result, debpkg::Error::MissingDebianBinary);
 }
 
 #[test]
@@ -55,10 +52,7 @@ fn ar_with_wrong_debian_binary_content_fails_parse() {
     drop(file);
 
     let pkg_result = debpkg::DebPkg::parse(&reader).err().unwrap();
-    assert_matches!(
-        pkg_result,
-        debpkg::Error::InvalidVersion
-    );
+    assert_matches!(pkg_result, debpkg::Error::InvalidVersion);
 }
 
 #[test]
@@ -73,10 +67,7 @@ fn ar_with_only_debian_binary_fails_control() {
 
     let mut pkg = debpkg::DebPkg::parse(&reader).unwrap();
     let control_result = pkg.control().err().unwrap();
-    assert_matches!(
-        control_result,
-        debpkg::Error::MissingControlArchive
-    );
+    assert_matches!(control_result, debpkg::Error::MissingControlArchive);
 }
 
 #[test]
@@ -101,10 +92,7 @@ fn ar_with_empty_control_tar_fails_control_extract() {
     let mut pkg = debpkg::DebPkg::parse(&reader).unwrap();
     let control_tar = pkg.control().unwrap();
     let control_result = debpkg::Control::extract(control_tar).err().unwrap();
-    assert_matches!(
-        control_result,
-        debpkg::Error::MissingControlFile
-    );
+    assert_matches!(control_result, debpkg::Error::MissingControlFile);
 }
 
 #[test]
@@ -143,10 +131,7 @@ fn ar_with_empty_control_fails_extract() {
     let mut pkg = debpkg::DebPkg::parse(&reader).unwrap();
     let control_tar = pkg.control().unwrap();
     let control_result = debpkg::Control::extract(control_tar).err().unwrap();
-    assert_matches!(
-        control_result,
-        debpkg::Error::InvalidControlFile
-    );
+    assert_matches!(control_result, debpkg::Error::InvalidControlFile);
 }
 
 #[test]
