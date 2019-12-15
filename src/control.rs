@@ -148,7 +148,10 @@ impl Control {
 
         let file = entries.find(|x| match x {
             Ok(file) => match file.path() {
-                Ok(path) => (path == std::path::Path::new("./control")) || (path == std::path::Path::new("control")),
+                Ok(path) => {
+                    (path == std::path::Path::new("./control"))
+                        || (path == std::path::Path::new("control"))
+                }
                 Err(_e) => false,
             },
             Err(_e) => false,
