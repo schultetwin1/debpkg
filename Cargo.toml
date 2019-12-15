@@ -6,7 +6,7 @@ description = "Library for parsing debian packages"
 homepage = "https://github.com/schultetwin1/debpkg/"
 repository = "https://github.com/schultetwin1/debpkg/"
 
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Matt Schulte <schultetwin1@gmail.com>"]
 edition = "2018"
 license = "MIT"
