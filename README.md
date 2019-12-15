@@ -1,6 +1,6 @@
 # DebPkg
 
-[![Build Status](https://mattschulte.visualstudio.com/debpkg/_apis/build/status/schultetwin1.debpkg?branchName=master)](https://mattschulte.visualstudio.com/debpkg/_build/latest?definitionId=2&branchName=master)
+[![Actions Status](https://github.com/schultetwin1/debpkg/workflows/CI/badge.svg)](https://github.com/schultetwin1/debpkg/actions)
 [![Rust Docs](https://docs.rs/debpkg/badge.svg)](https://docs.rs/debpkg/)
 [![Crates.io Link](https://img.shields.io/crates/v/debpkg)](https://crates.io/crates/debpkg)
 

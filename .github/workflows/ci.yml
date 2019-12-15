@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  ci:
+    runs-on: ${{ matrix.host }}
+    strategy:
+      matrix:
+        rust:
+          - stable
+          - beta
+          - nightly
+        host:
+          - 'ubuntu-latest'
+          - 'windows-latest'
+          - 'macos-latest'
+
+    steps:
+      - name: 'Checkout Code'
+        uses: actions/checkout@v1
+
+      - name: 'Setup Rust Toolchain'
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+          components: rustfmt, clippy
+
+      - name: 'Build'
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --all-features
+
+      - name: 'Test'
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+
+      - name: 'Format Check'
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+      - name: 'Clippy Check'
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: -- -D warnings
