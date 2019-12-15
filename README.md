@@ -26,10 +26,14 @@ Parsing a debian package
 ```rust
 let file = std::fs::File::open("test.deb").unwrap();
 let mut pkg = debpkg::DebPkg::parse(file).unwrap();
-println!("Package Name: {}", pkg.name());
-println!("Package Version: {}", pkg.version());
-let arch = pkg.get("Architecture").unwrap();
+let mut control_tar = pkg.control().unwrap();
+let control = debpkg::Control::extract(control_tar).unwrap();
+println!("Package Name: {}", control.name());
+println!("Package Version: {}", control.version());
+let arch = control.get("Architecture").unwrap();
 println!("Package Architecture: {}", arch);
+
+let mut data = pkg.data().unwrap();
 let dir = tempfile::TempDir::new().unwrap();
-pkg.unpack(dir).unwrap();
+data.unpack(dir).unwrap();
 ```
