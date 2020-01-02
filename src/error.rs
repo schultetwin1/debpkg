@@ -42,29 +42,24 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            Error::InvalidVersion => write!(f, "Contents of debian_binary is not 2.x"),
+            Error::MissingDebianBinary => write!(f, "Missing debian_binary file"),
+            Error::MissingControlFile => write!(f, "control archive is missing control file"),
+            Error::MissingPackageName => write!(f, "control file did not contain a package name"),
+            Error::MissingPackageVersion => {
+                write!(f, "control file did not contain a package version")
+            }
+            Error::InvalidControlFile => write!(f, "control file missed formatted"),
+            Error::MissingControlArchive => write!(f, "control archive is missing"),
+            Error::MissingDataArchive => write!(f, "data archive is missing"),
+            Error::ControlAlreadyRead => write!(f, "control archive has been past"),
+            Error::DataAlreadyRead => write!(f, "data archive has been past"),
             Error::Io(ref err) => write!(f, "{}", err),
-            _ => write!(f, "{}", self.description()),
         }
     }
 }
 
 impl StdError for Error {
-    fn description(&self) -> &str {
-        match self {
-            Error::InvalidVersion => "Contents of debian_binary is not 2.x",
-            Error::MissingDebianBinary => "Missing debian_binary file",
-            Error::MissingControlFile => "control archive is missing control file",
-            Error::MissingPackageName => "control file did not contain a package name",
-            Error::MissingPackageVersion => "control file did not contain a package version",
-            Error::InvalidControlFile => "control file missed formatted",
-            Error::MissingControlArchive => "control archive is missing",
-            Error::MissingDataArchive => "data archive is missing",
-            Error::ControlAlreadyRead => "control archive has been past",
-            Error::DataAlreadyRead => "data archive has been past",
-            Error::Io(_err) => "IO Error",
-        }
-    }
-
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match *self {
             Error::Io(ref err) => Some(err),
