@@ -190,7 +190,7 @@ impl Control {
         for line in lines {
             let line = line?;
 
-            match line.trim_end().chars().nth(0) {
+            match line.trim_end().chars().next() {
                 Some('#') => {
                     // Comment line, ignore
                     continue;
