@@ -214,8 +214,8 @@ fn get_tar_from_entry<'a, R: 'a + Read>(
         let bz2: Box<dyn Read> = Box::new(bzip2::read::BzDecoder::new(entry));
         Ok(tar::Archive::new(bz2))
     } else if entry_ident.ends_with(".tar.zst") {
-        // waiting to find a good zstd lib
-        unimplemented!();
+        let zstd: Box<dyn Read> = Box::new(zstd::stream::read::Decoder::new(entry)?);
+        Ok(tar::Archive::new(zstd))
     } else {
         Err(Error::MissingDataArchive)
     }
