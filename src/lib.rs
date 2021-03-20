@@ -204,12 +204,9 @@ fn get_tar_from_entry<'a, R: 'a + Read>(
     } else if entry_ident.ends_with(".tar.gz") {
         let gz: Box<dyn Read> = Box::new(flate2::read::GzDecoder::new(entry));
         Ok(tar::Archive::new(gz))
-    } else if entry_ident.ends_with(".tar.xz") {
+    } else if entry_ident.ends_with(".tar.xz") || entry_ident.ends_with(".tar.lzma") {
         let xz: Box<dyn Read> = Box::new(xz2::read::XzDecoder::new_multi_decoder(entry));
         Ok(tar::Archive::new(xz))
-    } else if entry_ident.ends_with(".tar.lzma") {
-        // waiting to find a good lzma lib
-        unimplemented!();
     } else if entry_ident.ends_with(".tar.bz2") {
         let bz2: Box<dyn Read> = Box::new(bzip2::read::BzDecoder::new(entry));
         Ok(tar::Archive::new(bz2))
