@@ -16,7 +16,7 @@ license = "MIT"
 
 [dependencies]
 ar = "0.8"
-arrayvec = "0.5"
+arrayvec = "0.6"
 bzip2 = "0.4"
 flate2 = "1.0"
 log = "0.4"
