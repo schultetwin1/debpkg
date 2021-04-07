@@ -23,7 +23,7 @@ log = "0.4"
 indexmap = "1.6"
 tar = "0.4"
 xz2 = "0.1"
-zstd = "0.6"
+zstd = "0.7"
 
 [dev-dependencies]
 assert_matches = "1.5"
