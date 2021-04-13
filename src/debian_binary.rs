@@ -19,7 +19,7 @@ pub fn parse_debian_binary_contents<R: Read>(stream: &mut R) -> Result<DebianBin
     }
 
     // note: This limits the largest minor version to 99999. Hopefully we never get above that.
-    let mut string = ArrayString::<[_; 5]>::new();
+    let mut string = ArrayString::<{ b"99999".len() }>::new();
     for byte in stream.bytes() {
         let byte = byte?;
         if byte == b'\n' {
