@@ -57,7 +57,9 @@ impl fmt::Display for Error {
             Error::MissingDataArchive => write!(f, "data archive is missing"),
             Error::ControlAlreadyRead => write!(f, "control archive has been past"),
             Error::DataAlreadyRead => write!(f, "data archive has been past"),
-            Error::UnknownEntryFormat  => write!(f, "entry in debian package has unknown file format"),
+            Error::UnknownEntryFormat => {
+                write!(f, "entry in debian package has unknown file format")
+            }
             Error::Io(ref err) => write!(f, "{}", err),
         }
     }
