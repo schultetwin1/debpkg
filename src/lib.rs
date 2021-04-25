@@ -196,24 +196,34 @@ impl<'a, R: 'a + Read> DebPkg<R> {
 fn get_tar_from_entry<'a, R: 'a + Read>(
     entry: ar::Entry<'a, R>,
 ) -> Result<tar::Archive<Box<dyn Read + 'a>>> {
-    let entry_ident = std::str::from_utf8(entry.header().identifier()).unwrap();
+    let mut reader = entry.take(1024);
+    let mut first_1kb = vec![];
+    reader.read_to_end(&mut first_1kb)?;
 
-    if entry_ident.ends_with(".tar") {
+    let is_tar = infer::archive::is_tar(&first_1kb);
+    let is_gz = infer::archive::is_gz(&first_1kb);
+    let is_xz = infer::archive::is_xz(&first_1kb);
+    let is_bz2 = infer::archive::is_bz2(&first_1kb);
+    let is_zst = infer::archive::is_zst(&first_1kb);
+
+    let entry = std::io::Cursor::new(first_1kb).chain(reader.into_inner());
+
+    if is_tar {
         let entry: Box<dyn Read> = Box::new(entry);
         Ok(tar::Archive::new(entry))
-    } else if entry_ident.ends_with(".tar.gz") {
+    } else if is_gz {
         let gz: Box<dyn Read> = Box::new(flate2::read::GzDecoder::new(entry));
         Ok(tar::Archive::new(gz))
-    } else if entry_ident.ends_with(".tar.xz") || entry_ident.ends_with(".tar.lzma") {
+    } else if is_xz {
         let xz: Box<dyn Read> = Box::new(xz2::read::XzDecoder::new_multi_decoder(entry));
         Ok(tar::Archive::new(xz))
-    } else if entry_ident.ends_with(".tar.bz2") {
+    } else if is_bz2 {
         let bz2: Box<dyn Read> = Box::new(bzip2::read::BzDecoder::new(entry));
         Ok(tar::Archive::new(bz2))
-    } else if entry_ident.ends_with(".tar.zst") {
+    } else if is_zst {
         let zstd: Box<dyn Read> = Box::new(zstd::stream::read::Decoder::new(entry)?);
         Ok(tar::Archive::new(zstd))
     } else {
-        Err(Error::MissingDataArchive)
+        Err(Error::UnknownEntryFormat)
     }
 }

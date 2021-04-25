@@ -90,9 +90,8 @@ fn ar_with_empty_control_tar_fails_control_extract() {
     drop(file);
 
     let mut pkg = debpkg::DebPkg::parse(&reader).unwrap();
-    let control_tar = pkg.control().unwrap();
-    let control_result = debpkg::Control::extract(control_tar).err().unwrap();
-    assert_matches!(control_result, debpkg::Error::MissingControlFile);
+    let control_result = pkg.control().err().unwrap();
+    assert_matches!(control_result, debpkg::Error::UnknownEntryFormat);
 }
 
 #[test]

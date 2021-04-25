@@ -35,6 +35,9 @@ pub enum Error {
     /// The data archive was already read and thus can not be read again
     DataAlreadyRead,
 
+    /// The entry in the deb package was an unknown file format
+    UnknownEntryFormat,
+
     /// These was an IoError during the parsing
     Io(IoError),
 }
@@ -54,6 +57,7 @@ impl fmt::Display for Error {
             Error::MissingDataArchive => write!(f, "data archive is missing"),
             Error::ControlAlreadyRead => write!(f, "control archive has been past"),
             Error::DataAlreadyRead => write!(f, "data archive has been past"),
+            Error::UnknownEntryFormat  => write!(f, "entry in debian package has unknown file format"),
             Error::Io(ref err) => write!(f, "{}", err),
         }
     }
