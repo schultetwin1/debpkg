@@ -25,7 +25,7 @@ impl<'a> UncasedStrRef<'a> {
 
 impl<'a> PartialEq for UncasedStrRef<'a> {
     fn eq(&self, other: &Self) -> bool {
-        self.0.eq_ignore_ascii_case(&other.0)
+        self.0.eq_ignore_ascii_case(other.0)
     }
 }
 
@@ -53,7 +53,7 @@ impl PartialEq for Tag {
 
 impl<'a> PartialEq<UncasedStrRef<'a>> for Tag {
     fn eq(&self, other: &UncasedStrRef) -> bool {
-        self.0.eq_ignore_ascii_case(&other.0)
+        self.0.eq_ignore_ascii_case(other.0)
     }
 }
 
@@ -225,11 +225,11 @@ impl Control {
                     let line = line.trim();
                     let mut split = line.splitn(2, ':');
                     let field_name = match split.next() {
-                        Some(ref field_name) => field_name.trim(),
+                        Some(field_name) => field_name.trim(),
                         None => return Err(Error::InvalidControlFile),
                     };
                     let field_value = match split.next() {
-                        Some(ref field_name) => field_name.trim(),
+                        Some(field_name) => field_name.trim(),
                         None => return Err(Error::InvalidControlFile),
                     };
                     let field_tag: Tag = field_name.into();
