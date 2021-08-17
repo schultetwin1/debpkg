@@ -15,7 +15,7 @@ license = "MIT"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ar = "0.8"
+ar = "0.9"
 arrayvec = "0.7"
 bzip2 = "0.4"
 flate2 = "1.0"
