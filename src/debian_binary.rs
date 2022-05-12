@@ -25,7 +25,7 @@ pub fn parse_debian_binary_contents<R: Read>(stream: &mut R) -> Result<DebianBin
         if byte == b'\n' {
             break;
         }
-        if !(byte as char).is_digit(10) {
+        if !(byte as char).is_ascii_digit() {
             return Err(Error::InvalidVersion);
         }
         if string.is_full() {
