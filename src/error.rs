@@ -38,6 +38,10 @@ pub enum Error {
     /// The entry in the deb package was an unknown file format
     UnknownEntryFormat,
 
+    /// The entry in the deb package was for a file format that
+    /// was not configured in features
+    UnconfiguredFileFormat(String),
+
     /// These was an IoError during the parsing
     Io(IoError),
 }
@@ -59,6 +63,9 @@ impl fmt::Display for Error {
             Error::DataAlreadyRead => write!(f, "data archive has been past"),
             Error::UnknownEntryFormat => {
                 write!(f, "entry in debian package has unknown file format")
+            }
+            Error::UnconfiguredFileFormat(ref format) => {
+                write!(f, "entry in debian package requires feature {}", format)
             }
             Error::Io(ref err) => write!(f, "{}", err),
         }

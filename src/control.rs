@@ -364,16 +364,14 @@ mod tests {
     #[test]
     fn control_keys_list_everything() {
         let ctrl = Control::parse(&b"package: name\nversion: 1.8.2\nTest: a"[..]).unwrap();
-        let tags: std::vec::Vec<&str> = ctrl.tags().collect();
-        assert!(tags.len() == 3);
+        assert!(ctrl.tags().count() == 3);
     }
 
     #[test]
     fn control_keys_captures_dash() {
         let ctrl =
             Control::parse(&b"package: name\nversion: 1.8.2\nInstalled-Size: a"[..]).unwrap();
-        let tags: std::vec::Vec<&str> = ctrl.tags().collect();
-        assert!(tags.len() == 3);
+        assert!(ctrl.tags().count() == 3);
     }
 
     #[test]
