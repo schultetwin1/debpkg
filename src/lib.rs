@@ -212,17 +212,45 @@ fn get_tar_from_entry<'a, R: 'a + Read>(
         let entry: Box<dyn Read> = Box::new(entry);
         Ok(tar::Archive::new(entry))
     } else if is_gz {
-        let gz: Box<dyn Read> = Box::new(flate2::read::GzDecoder::new(entry));
-        Ok(tar::Archive::new(gz))
+        #[cfg(feature = "gzip")]
+        {
+            let gz: Box<dyn Read> = Box::new(flate2::read::GzDecoder::new(entry));
+            Ok(tar::Archive::new(gz))
+        }
+        #[cfg(not(feature = "gzip"))]
+        {
+            Err(Error::UnconfiguredFileFormat("gzip".to_string()))
+        }
     } else if is_xz {
-        let xz: Box<dyn Read> = Box::new(xz2::read::XzDecoder::new_multi_decoder(entry));
-        Ok(tar::Archive::new(xz))
+        #[cfg(feature = "xz")]
+        {
+            let xz: Box<dyn Read> = Box::new(xz2::read::XzDecoder::new_multi_decoder(entry));
+            Ok(tar::Archive::new(xz))
+        }
+        #[cfg(not(feature = "xz"))]
+        {
+            Err(Error::UnconfiguredFileFormat("xz".to_string()))
+        }
     } else if is_bz2 {
-        let bz2: Box<dyn Read> = Box::new(bzip2::read::BzDecoder::new(entry));
-        Ok(tar::Archive::new(bz2))
+        #[cfg(feature = "bzip2")]
+        {
+            let bz2: Box<dyn Read> = Box::new(bzip2::read::BzDecoder::new(entry));
+            Ok(tar::Archive::new(bz2))
+        }
+        #[cfg(not(feature = "bzip2"))]
+        {
+            Err(Error::UnconfiguredFileFormat("bzip2".to_string()))
+        }
     } else if is_zst {
-        let zstd: Box<dyn Read> = Box::new(zstd::stream::read::Decoder::new(entry)?);
-        Ok(tar::Archive::new(zstd))
+        #[cfg(feature = "zstd")]
+        {
+            let zstd: Box<dyn Read> = Box::new(zstd::stream::read::Decoder::new(entry)?);
+            Ok(tar::Archive::new(zstd))
+        }
+        #[cfg(not(feature = "zstd"))]
+        {
+            Err(Error::UnconfiguredFileFormat("zstd".to_string()))
+        }
     } else {
         Err(Error::UnknownEntryFormat)
     }

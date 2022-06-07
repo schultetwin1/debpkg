@@ -1,4 +1,3 @@
-use debpkg;
 use tempfile::NamedTempFile;
 
 use std::convert::TryFrom;
