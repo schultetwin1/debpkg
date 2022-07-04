@@ -19,7 +19,7 @@ ar = "0.9"
 arrayvec = "0.7"
 bzip2 = { version = "0.4", optional = true }
 flate2 = { version = "1.0", optional = true }
-infer = "0.8"
+infer = "0.9"
 log = "0.4"
 indexmap = "1.6"
 tar = "0.4"
