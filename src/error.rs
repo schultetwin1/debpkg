@@ -65,9 +65,9 @@ impl fmt::Display for Error {
                 write!(f, "entry in debian package has unknown file format")
             }
             Error::UnconfiguredFileFormat(ref format) => {
-                write!(f, "entry in debian package requires feature {}", format)
+                write!(f, "entry in debian package requires feature {format}")
             }
-            Error::Io(ref err) => write!(f, "{}", err),
+            Error::Io(ref err) => write!(f, "{err}"),
         }
     }
 }
