@@ -24,7 +24,7 @@ log = "0.4"
 indexmap = "1.9.1"
 tar = "0.4"
 xz2 = { version = "0.1", optional = true }
-zstd = { version = "0.11", optional = true }
+zstd = { version = "0.12", optional = true }
 
 [dev-dependencies]
 assert_matches = "1.5"
