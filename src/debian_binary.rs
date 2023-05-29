@@ -1,7 +1,5 @@
 use std::io::Read;
 
-use arrayvec::ArrayString;
-
 use crate::{Error, Result};
 
 #[derive(Debug)]
@@ -19,16 +17,13 @@ pub fn parse_debian_binary_contents<R: Read>(stream: &mut R) -> Result<DebianBin
     }
 
     // note: This limits the largest minor version to 99999. Hopefully we never get above that.
-    let mut string = ArrayString::<{ b"99999".len() }>::new();
+    let mut string = String::new();
     for byte in stream.bytes() {
         let byte = byte?;
         if byte == b'\n' {
             break;
         }
         if !(byte as char).is_ascii_digit() {
-            return Err(Error::InvalidVersion);
-        }
-        if string.is_full() {
             return Err(Error::InvalidVersion);
         }
         string.push(byte as char);
