@@ -1,12 +1,15 @@
 name: CI
 
 on:
+  workflow_dispatch:
   push:
     branches:
-      - master
+      - main
+  pull_request:
+    branches:
+      - main
   schedule:
     - cron: '0 0 * * *'
-  workflow_dispatch:
 
 jobs:
   ci:
@@ -24,35 +27,22 @@ jobs:
 
     steps:
       - name: 'Checkout Code'
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: 'Setup Rust Toolchain'
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust }}
-          override: true
           components: rustfmt, clippy
 
       - name: 'Build'
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --release --all-features
+        run: cargo build --release --all-features
 
       - name: 'Test'
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test -- --test-threads=1 # Needed for now due to use of env vars
 
       - name: 'Format Check'
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+        run: cargo fmt --all -- --check
 
       - name: 'Clippy Check'
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+        run: cargo clippy -- -D warnings
