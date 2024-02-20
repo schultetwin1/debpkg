@@ -1,6 +1,5 @@
 use std::hash::{Hash, Hasher};
 use std::io::{BufRead, BufReader, Read};
-use std::string::String;
 
 use crate::{Error, Result};
 
