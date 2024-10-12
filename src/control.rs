@@ -22,15 +22,15 @@ impl<'a> UncasedStrRef<'a> {
     }
 }
 
-impl<'a> PartialEq for UncasedStrRef<'a> {
+impl PartialEq for UncasedStrRef<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.0.eq_ignore_ascii_case(other.0)
     }
 }
 
-impl<'a> Eq for UncasedStrRef<'a> {}
+impl Eq for UncasedStrRef<'_> {}
 
-impl<'a> Hash for UncasedStrRef<'a> {
+impl Hash for UncasedStrRef<'_> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         for c in self.0.as_bytes() {
             c.to_ascii_lowercase().hash(state)
@@ -50,13 +50,13 @@ impl PartialEq for Tag {
     }
 }
 
-impl<'a> PartialEq<UncasedStrRef<'a>> for Tag {
+impl PartialEq<UncasedStrRef<'_>> for Tag {
     fn eq(&self, other: &UncasedStrRef) -> bool {
         self.0.eq_ignore_ascii_case(other.0)
     }
 }
 
-impl<'a> PartialEq<Tag> for UncasedStrRef<'a> {
+impl PartialEq<Tag> for UncasedStrRef<'_> {
     fn eq(&self, other: &Tag) -> bool {
         self.0.eq_ignore_ascii_case(other.0.as_str())
     }
@@ -84,13 +84,13 @@ impl AsRef<str> for Tag {
     }
 }
 
-impl<'a> Equivalent<UncasedStrRef<'a>> for Tag {
+impl Equivalent<UncasedStrRef<'_>> for Tag {
     fn equivalent(&self, key: &UncasedStrRef) -> bool {
         self == key
     }
 }
 
-impl<'a> Equivalent<Tag> for UncasedStrRef<'a> {
+impl Equivalent<Tag> for UncasedStrRef<'_> {
     fn equivalent(&self, key: &Tag) -> bool {
         self == key
     }
