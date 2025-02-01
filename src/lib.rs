@@ -86,7 +86,7 @@ impl<'a, R: 'a + Read> DebPkg<R> {
     /// # Arguments
     ///
     /// * `reader` - A type which implements `std::io::Read` and `std::io::Seek`
-    ///              and is formatted as an ar archive
+    ///   and is formatted as an ar archive
     ///
     /// # Example
     ///

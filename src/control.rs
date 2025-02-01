@@ -168,7 +168,7 @@ impl Control {
     /// # Arguments
     ///
     /// * `reader` - A types which implements read as contains Debian binary
-    ///              package control file
+    ///   package control file
     ///
     /// # Example
     ///
