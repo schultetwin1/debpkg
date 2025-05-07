@@ -26,7 +26,7 @@ fn main() {
                 "ERROR: Failed to open debian file \"{}\"",
                 deb_path.display()
             );
-            println!("       {}", e);
+            println!("       {e}");
             process::exit(1);
         }
     };
@@ -38,7 +38,7 @@ fn main() {
                 "ERROR: Failed to parse debian file \"{}\"",
                 deb_path.display()
             );
-            println!("       {}", e);
+            println!("       {e}");
             process::exit(1);
         }
     };
@@ -50,7 +50,7 @@ fn main() {
                 "ERROR: Failed to get control tar from debian file \"{}\"",
                 deb_path.display()
             );
-            println!("       {}", e);
+            println!("       {e}");
             process::exit(1);
         }
     };
@@ -62,7 +62,7 @@ fn main() {
                 "ERROR: Failed to parse debian control file \"{}\"",
                 deb_path.display()
             );
-            println!("       {}", e);
+            println!("       {e}");
             process::exit(1);
         }
     };
@@ -78,7 +78,7 @@ fn main() {
                 .split('\n')
                 .collect::<std::vec::Vec<&str>>()
                 .join("\n ");
-            println!(" {}", long_desc);
+            println!(" {long_desc}");
         } else {
             println!("{}: {}", tag, control.get(tag).unwrap());
         }

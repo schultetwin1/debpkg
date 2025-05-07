@@ -26,7 +26,7 @@ fn main() {
                 "ERROR: Failed to open debian file \"{}\"",
                 deb_path.display()
             );
-            println!("       {}", e);
+            println!("       {e}");
             process::exit(1);
         }
     };
@@ -38,7 +38,7 @@ fn main() {
                 "ERROR: Failed to parse debian file \"{}\"",
                 deb_path.display()
             );
-            println!("       {}", e);
+            println!("       {e}");
             process::exit(1);
         }
     };
