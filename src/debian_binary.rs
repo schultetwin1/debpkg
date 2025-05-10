@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::io::{BufReader, Read};
 
 use crate::{Error, Result};
 
@@ -9,8 +9,9 @@ pub struct DebianBinaryVersion {
 }
 
 pub fn parse_debian_binary_contents<R: Read>(stream: &mut R) -> Result<DebianBinaryVersion> {
+    let mut reader = BufReader::new(stream);
     let mut first_two_bytes: [u8; 2] = [0, 0];
-    stream.read_exact(&mut first_two_bytes)?;
+    reader.read_exact(&mut first_two_bytes)?;
 
     if &first_two_bytes != b"2." {
         return Err(Error::InvalidVersion);
@@ -18,7 +19,7 @@ pub fn parse_debian_binary_contents<R: Read>(stream: &mut R) -> Result<DebianBin
 
     // note: This limits the largest minor version to 99999. Hopefully we never get above that.
     let mut string = String::new();
-    for byte in stream.bytes() {
+    for byte in reader.bytes() {
         let byte = byte?;
         if byte == b'\n' {
             break;
