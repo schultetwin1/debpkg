@@ -18,7 +18,6 @@ pub fn parse_debian_binary_contents<R: Read>(stream: &mut R) -> Result<DebianBin
 
     // note: This limits the largest minor version to 99999. Hopefully we never get above that.
     let mut string = String::new();
-    #[expect(clippy::unbuffered_bytes)]
     for byte in stream.bytes() {
         let byte = byte?;
         if byte == b'\n' {
